@@ -2,14 +2,15 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>WebMap · 项目主页</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="dist/style.css">
 </head>
 <body class="project-home-open">
 <section id="projecthome">
-  <aside class="office-nav" aria-label="项目导航">
+  <div id="homenavbackdrop" class="sheet-backdrop" hidden></div>
+  <aside class="office-nav" id="officenav" aria-label="项目导航">
     <div class="office-brand"><span class="office-mark" aria-hidden="true">▧</span><span>WebMap</span></div>
     <nav>
       <button id="projectstart" class="active" type="button" aria-current="page"><svg class="navglyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8.6 10 3.5l6 5.1V16.5H12.4V11H7.6v5.5H4V8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span>开始</span></button>
@@ -21,6 +22,7 @@
   </aside>
   <div class="office-main">
     <div class="projecttop" role="toolbar" aria-label="命令栏">
+      <button type="button" id="homenavtoggle" class="mobile-only" aria-controls="officenav" aria-expanded="false">菜单</button>
       <div class="projecttop-title"><span>WebMap</span><span class="projecttop-sep" aria-hidden="true">/</span><small>项目工作台</small></div>
       <label class="command-search">
         <svg class="searchglyph" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12.2 12.2 16.5 16.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -84,7 +86,8 @@
 <div id="editorloading" hidden style="position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#faf9f8ee;color:#185c37;font:15px 'Segoe UI','Microsoft Yahei',sans-serif">正在加载编辑器…</div>
 
 <div id="editor-root" hidden>
-<aside class="nav">
+<div id="editorbackdrop" class="sheet-backdrop" hidden></div>
+<aside class="nav" id="sitenav">
   <div class="brand">▧ <b>WebMap</b><small>WEBMAP</small></div>
   <div class="workspace">北区制造基地 <span>⌄</span></div>
   <div class="navlabel">工作空间</div>
@@ -102,7 +105,11 @@
 </aside>
 <main>
   <header>
-    <div>工作空间 <span>/</span> <b id="crumb">厂区总平图</b></div>
+    <div class="mobile-chrome">
+      <button type="button" id="navtoggle" class="mobile-only" aria-controls="sitenav" aria-expanded="false">目录</button>
+      <button type="button" id="propstoggle" class="mobile-only" aria-controls="proppanel" aria-expanded="false">属性</button>
+    </div>
+    <div class="crumb">工作空间 <span>/</span> <b id="crumb">厂区总平图</b></div>
     <div class="headeractions"><span id="saved">● 已保存</span><button id="import">导入</button><button id="export">↗ 导出图纸</button></div>
   </header>
   <section class="heading">
@@ -129,6 +136,15 @@
     </div>
     <div class="drawing">
       <div class="canvaswrap">
+        <div id="touchdock" class="touchdock" hidden>
+          <button type="button" id="touchprops">属性</button>
+          <button type="button" id="touchenter">进入车间图纸</button>
+          <button type="button" id="touchrename">编辑名称</button>
+          <button type="button" id="touchdelete">删除</button>
+          <button type="button" id="touchdone">完成</button>
+          <button type="button" id="touchundopoint">撤销一点</button>
+          <button type="button" id="touchcancel">取消</button>
+        </div>
         <svg id="canvas" tabindex="0" viewBox="0 0 1200 760" role="img" aria-label="可编辑厂区平面图">
           <defs><pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#dbe2e2"/></pattern></defs>
           <rect width="1200" height="760" fill="url(#dots)" id="gridbg"/>
@@ -137,8 +153,8 @@
         <div class="canvaslegend"><span>■ 车间</span><span>■ 机房</span><span>■ 机柜</span><span>□ 备注</span></div>
         <div class="north">↑<small>N</small></div>
       </div>
-      <aside class="properties">
-        <div class="paneltitle">属性面板 <span>⚙</span></div>
+      <aside class="properties" id="proppanel">
+        <div class="paneltitle">属性面板 <span>⚙</span><button type="button" id="propsclose" class="mobile-only">完成</button></div>
         <div id="properties"></div>
       </aside>
     </div>

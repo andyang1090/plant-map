@@ -1,6 +1,7 @@
 // Window capture runs before the separate drawing/editor keyboard handlers.
 window.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  if(typeof window.__plantCloseMobileSheets==='function'&&window.__plantCloseMobileSheets()){e.preventDefault();e.stopImmediatePropagation();return}
   e.preventDefault();e.stopImmediatePropagation();
   roomTextEditor?.cancelEdit();
   axisTextEditor?.cancelEdit();
