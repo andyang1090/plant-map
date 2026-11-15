@@ -33,3 +33,7 @@ body.project-home-open>main,body.project-home-open>.nav,body.project-home-open>#
 /* Current workshop in the navigation tree */
 .treeitem.active{background:#eaf4ef;color:#167455;font-weight:600;box-shadow:inset 3px 0 #237957;border-radius:5px}.treeitem.active:hover{background:#dceee4}.treeitem:focus-visible{outline:2px solid #73ab8e;outline-offset:1px}
 .workshop-row{display:flex;align-items:center;gap:2px;min-width:0}.workshop-row .treeitem{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:14px;padding-right:5px}.workshop-order-actions{display:flex;gap:1px;flex-shrink:0}.workshop-order-actions button{padding:4px 5px;font-size:12px;border-color:transparent;color:#6b8d7b;background:transparent}.workshop-order-actions button:hover:not(:disabled){background:#eaf4ef;color:#167455}.workshop-order-actions button:disabled{opacity:.25;cursor:default}
+/* Header action on the project home, same control shape as the editor header buttons */
+.projecttop-side{display:flex;align-items:center;gap:10px}
+a.download-project{display:inline-block;cursor:pointer;border:1px solid #1f7457;background:#1f7457;border-radius:6px;padding:8px 12px;color:#fff;text-decoration:none;font-size:14px;line-height:normal;white-space:nowrap}
+a.download-project:hover{background:#185c37;border-color:#185c37;color:#fff}
