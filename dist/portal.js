@@ -40,6 +40,7 @@ async function bootEditor(){
   return editorBootPromise;
 }
 function enterProjectHome(){
+  sessionStorage.removeItem('plant-atlas-land-on-site');
   sessionStorage.setItem('plant-atlas-project-mode','home');
   document.body.classList.add('project-home-open');
   const home=pq('#projecthome');if(home)home.hidden=false;
@@ -47,12 +48,20 @@ function enterProjectHome(){
   document.title='WebMap · 项目主页';
   renderProjectHome();
 }
+// Homepage opens always boot the editor on the site plan. The one-shot flag is
+// consumed after scripts load; prefer-site keeps a later refresh on that plan.
+function markProjectEditorEntry(){
+  sessionStorage.setItem('plant-atlas-project-mode','editor');
+  sessionStorage.setItem('plant-atlas-land-on-site','1');
+  sessionStorage.setItem('plant-atlas-prefer-site','1');
+  try{if(location.hash)window.history.replaceState(window.history.state,'',location.pathname+location.search)}catch{}
+}
 function openProjectEditor(id){
   const library=loadProjectsLibrary()||projectLibrary,project=library.projects.find(p=>p.id===id&&!p.deletedAt);
   if(!project)return;
   try{
     library.activeId=id;saveProjectsLibrary(library);
-    sessionStorage.setItem('plant-atlas-project-mode','editor');
+    markProjectEditorEntry();
     location.reload();
   }catch{portalToast('无法打开项目，请先导出备份')}
 }
@@ -235,6 +244,7 @@ window.returnToProjectPortal=function(){
   sessionStorage.setItem('plant-atlas-project-mode','home');
   location.reload();
 };
+window.markProjectEditorEntry=markProjectEditorEntry;
 window.openProjectEditor=openProjectEditor;
 window.renderProjectHome=renderProjectHome;
 window.showProjectHome=function(){window.returnToProjectPortal()};

@@ -15,7 +15,12 @@ function showProjectEditor(id){
     render();
     return;
   }
-  try{flushSave();library.activeId=id;saveProjectsLibrary(library);sessionStorage.setItem('plant-atlas-project-mode','editor');location.reload()}catch{toast('无法保存项目，请先导出当前图纸备份')}
+  try{
+    flushSave();library.activeId=id;saveProjectsLibrary(library);
+    if(typeof markProjectEditorEntry==='function')markProjectEditorEntry();
+    else sessionStorage.setItem('plant-atlas-project-mode','editor');
+    location.reload();
+  }catch{toast('无法保存项目，请先导出当前图纸备份')}
 }
 
 function showProjectHome(){
@@ -43,3 +48,8 @@ document.body.classList.remove('project-home-open');
 projectHome.hidden=true;
 const editorRoot=$('#editor-root');if(editorRoot)editorRoot.hidden=false;
 document.title=(loadProjectsLibrary()||projectLibrary).projects.find(p=>p.id===currentProjectId)?.name||'WebMap';
+if(window.__syncSiteAfterBoot&&typeof syncWorkshopRoute==='function'){
+  window.__syncSiteAfterBoot=false;
+  if(page)changePage(null);
+  syncWorkshopRoute();
+}

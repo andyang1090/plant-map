@@ -88,9 +88,16 @@
   <div class="brand">▧ <b>WebMap</b><small>WEBMAP</small></div>
   <div class="workspace">北区制造基地 <span>⌄</span></div>
   <div class="navlabel">工作空间</div>
-  <button class="navitem active" id="home">▦　厂区总平图</button>
-  <div class="navlabel">车间目录 <span id="count"></span></div>
-  <div id="tree"></div>
+  <div class="site-branch">
+    <div class="site-parent">
+      <button type="button" class="navfold" id="sitefold" aria-expanded="true" aria-controls="sitechildren" aria-label="折叠车间目录" title="折叠车间目录"><span class="navfold-icon" aria-hidden="true"></span></button>
+      <button class="navitem active" id="home" type="button">▦　厂区总平图</button>
+    </div>
+    <div class="site-children" id="sitechildren">
+      <div class="navlabel site-dir-label">车间目录 <span id="count"></span></div>
+      <div id="tree" role="group" aria-label="车间目录"></div>
+    </div>
+  </div>
   <div class="navbottom"><i></i> 本地工作空间<br><small>数据自动保存在此浏览器</small></div>
 </aside>
 <main>

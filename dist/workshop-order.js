@@ -1,4 +1,25 @@
 // Directory ordering is independent of the drawing's stacking order.
+// Workshops hang under the site plan and can be folded away.
+let siteDirectoryOpen=sessionStorage.getItem('plant-atlas-site-tree-open')!=='0';
+function syncSiteDirectory(){
+  const fold=$('#sitefold'),children=$('#sitechildren');
+  if(!fold||!children)return;
+  const label=siteDirectoryOpen?'折叠车间目录':'展开车间目录';
+  fold.setAttribute('aria-expanded',siteDirectoryOpen?'true':'false');
+  fold.setAttribute('aria-label',label);
+  fold.title=label;
+  children.hidden=!siteDirectoryOpen;
+}
+function bindSiteDirectory(){
+  const fold=$('#sitefold');
+  if(!fold||fold.dataset.bound)return;
+  fold.dataset.bound='1';
+  fold.addEventListener('click',()=>{
+    siteDirectoryOpen=!siteDirectoryOpen;
+    sessionStorage.setItem('plant-atlas-site-tree-open',siteDirectoryOpen?'1':'0');
+    syncSiteDirectory();
+  });
+}
 function orderedWorkshops(){
   const workshops=data.items.filter(o=>o.type==='workshop');
   const byId=new Map(workshops.map(o=>[o.id,o]));
@@ -28,6 +49,10 @@ function renderWorkshopDirectory(){
     }
     row.append(actions);$('#tree').append(row);
   });
+  const count=$('#count');
+  if(count)count.setAttribute('aria-label',workshops.length+' 个车间');
+  bindSiteDirectory();
+  syncSiteDirectory();
 }
 const workshopOrderRender=render;
 render=function(){workshopOrderRender();renderWorkshopDirectory()};
