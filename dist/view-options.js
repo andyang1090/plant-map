@@ -115,11 +115,11 @@ function drawAxisIntersections() {
     const label = `${h.name}/${v.name}`;
     const size = Math.max(objectFont(h) * fontWorldScale(h), objectFont(v) * fontWorldScale(v));
     const x = v.x+7*scale, y = h.y-7*scale;
-    const group = node('g', {'data-horizontal':h.id, 'data-vertical':v.id});
+    const group = node('g', {'data-axis-cross':'', 'data-horizontal':h.id, 'data-vertical':v.id, 'pointer-events':'none'});
     const text = node('text', {x, y, fill:'#1d694d', 'font-size':size,
       'font-weight':600, 'paint-order':'stroke', stroke:'white', 'stroke-width':4*scale,
-      'stroke-linejoin':'round'}, label);
-    group.append(node('circle', {cx:v.x, cy:h.y, r:3*scale, fill:'#237957'}), text);
+      'stroke-linejoin':'round', 'pointer-events':'none'}, label);
+    group.append(node('circle', {cx:v.x, cy:h.y, r:3*scale, fill:'#237957', 'pointer-events':'none'}), text);
     intersections.append(group);
   }
   svg.append(intersections);
