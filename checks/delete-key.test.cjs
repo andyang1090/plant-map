@@ -1,0 +1,12 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('dist/delete-key.js','utf8');
+const ctx={document:{querySelector:()=>null}};vm.createContext(ctx);
+vm.runInContext(source.slice(source.indexOf('function shouldDeleteCanvasObject'),source.lastIndexOf("window.addEventListener('keydown'")),ctx);
+assert.equal(ctx.shouldDeleteCanvasObject({key:'Delete',target:{tagName:'svg'}}),true);
+assert.equal(ctx.shouldDeleteCanvasObject({key:'Del',target:{tagName:'BUTTON'}}),true);
+assert.equal(ctx.shouldDeleteCanvasObject({code:'Delete',target:{tagName:'BODY'}}),true);
+for(const tagName of ['INPUT','TEXTAREA','SELECT'])assert.equal(ctx.shouldDeleteCanvasObject({key:'Delete',target:{tagName}}),false);
+assert.equal(ctx.shouldDeleteCanvasObject({key:'Delete',target:{isContentEditable:true}}),false);
+ctx.document.querySelector=()=>({open:true});
+assert.equal(ctx.shouldDeleteCanvasObject({key:'Delete',target:{tagName:'svg'}}),false);
+console.log('Canvas Delete, alternate key names and text/dialog focus guards passed.');

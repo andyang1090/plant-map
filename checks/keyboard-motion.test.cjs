@@ -1,0 +1,10 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const objects=[{id:'a',x:1,y:2},{id:'b',x:4,y:6}];let checkpoints=0,saves=0;
+const ctx={syncSelection:()=>{},selectedObjects:()=>objects,selectionIds:new Set(['a','b']),tool:'select',drag:null,wallGesture:null,selectionGesture:null,sketch:null,checkpoint:()=>checkpoints++,draw:()=>{},props:()=>{},save:()=>saves++};
+vm.createContext(ctx);const s=fs.readFileSync('dist/keyboard-motion.js','utf8');
+vm.runInContext(s.slice(s.indexOf('let nudgeHeld'),s.indexOf("window.addEventListener('keydown'")),ctx);
+assert.equal(ctx.nudgeObjects({key:'ArrowRight'}),true);assert.equal(objects[0].x,1.1);assert.equal(objects[1].x,4.1);
+ctx.nudgeObjects({key:'ArrowRight',repeat:true});assert.equal(checkpoints,1);
+ctx.nudgeObjects({key:'ArrowUp',shiftKey:true});assert.equal(objects[0].y,1);assert.equal(objects[1].y,5);
+ctx.tool='wall';assert.equal(ctx.nudgeObjects({key:'ArrowLeft'}),false);
+assert.equal(saves,3);console.log('Single/group nudging steps, held-key undo grouping and drawing guard passed.');
