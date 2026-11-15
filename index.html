@@ -9,18 +9,29 @@
 </head>
 <body class="project-home-open">
 <section id="projecthome">
-  <aside class="office-nav">
-    <div class="office-brand">▧ WebMap</div>
+  <aside class="office-nav" aria-label="项目导航">
+    <div class="office-brand"><span class="office-mark" aria-hidden="true">▧</span><span>WebMap</span></div>
     <nav>
-      <button id="projectstart" class="active">⌂　开始</button>
-      <button id="projectnewnav">＋　新建</button>
-      <button id="projectimport">导入 JSON</button>
-      <button id="projecttrash">回收站</button>
+      <button id="projectstart" class="active" type="button" aria-current="page"><svg class="navglyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8.6 10 3.5l6 5.1V16.5H12.4V11H7.6v5.5H4V8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span>开始</span></button>
+      <button id="projectnewnav" type="button"><svg class="navglyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>新建</span></button>
+      <button id="projectimport" type="button"><svg class="navglyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6.5 9 10 12.5 13.5 9M4.5 16.5h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>导入 JSON</span></button>
+      <button id="projecttrash" type="button"><svg class="navglyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 6.5h10M8 6.5V4.8h4v1.7M7.2 6.5l.4 9h4.8l.4-9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>回收站</span></button>
     </nav>
-    <div class="office-local">● 本地工作空间<small>图纸自动保存在此浏览器 · 无需部署</small></div>
+    <div class="office-local"><span class="local-dot" aria-hidden="true"></span><div><b>本地工作空间</b><small>图纸自动保存在此浏览器 · 无需部署</small></div></div>
   </aside>
   <div class="office-main">
-    <div class="projecttop"><span>WebMap</span><div class="projecttop-side"><small>项目工作台</small><a class="download-project" href="https://github.com/andyang1090/plant-map/archive/refs/heads/main.zip">下载项目</a></div></div>
+    <div class="projecttop" role="toolbar" aria-label="命令栏">
+      <div class="projecttop-title"><span>WebMap</span><span class="projecttop-sep" aria-hidden="true">/</span><small>项目工作台</small></div>
+      <label class="command-search">
+        <svg class="searchglyph" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12.2 12.2 16.5 16.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <input id="projectsearch" aria-label="搜索项目" placeholder="搜索项目" autocomplete="off">
+        <button type="button" id="projectsearchclear" aria-label="清除搜索" hidden>×</button>
+      </label>
+      <div class="projecttop-side">
+        <div id="projectcommands" class="projectcommands" role="group" aria-label="所选项目"></div>
+        <a class="download-project" href="https://github.com/andyang1090/plant-map/archive/refs/heads/main.zip">下载项目</a>
+      </div>
+    </div>
     <div class="projectcontent">
       <div class="projectheading">
         <div>
@@ -28,8 +39,8 @@
           <p>选择一个项目，继续规划厂区与车间空间。</p>
         </div>
       </div>
-      <section class="office-create">
-        <h2>新建</h2>
+      <section class="office-create" aria-labelledby="createheading">
+        <h2 id="createheading">新建</h2>
         <button id="newproject" type="button">
           <span class="blank-preview"><b>＋</b></span>
           <strong>空白项目</strong>
@@ -39,24 +50,29 @@
       <div class="projectfilters">
         <div>
           <h2 id="projectlisttitle">最近使用的项目</h2>
-          <p>选择项目，继续上次的工作</p>
+          <p id="projectlistsubtitle">单击选择项目，双击或按 Enter 打开。</p>
         </div>
-        <label><input id="projectsearch" aria-label="搜索项目" placeholder="搜索项目"></label>
       </div>
-      <div id="projectcards"></div>
+      <div class="projectlisthead" aria-hidden="true">
+        <span></span>
+        <span>名称</span>
+        <span>最近编辑</span>
+        <span>操作</span>
+      </div>
+      <div id="projectcards" role="listbox" aria-label="最近使用的项目"></div>
       <p class="projectfoot">各项目图纸独立保存在此浏览器中，可在项目内导出 JSON 备份。</p>
     </div>
   </div>
 </section>
 
-<dialog id="projectdialog">
+<dialog id="projectdialog" aria-labelledby="projectdialogtitle">
   <form>
     <div class="dialoghead">
       <h2 id="projectdialogtitle">新建项目</h2>
-      <button type="button" id="closeprojectdialog" aria-label="关闭项目设置">×</button>
+      <button type="button" id="closeprojectdialog" class="dialogclose" aria-label="关闭项目设置">×</button>
     </div>
     <label class="field" for="projectname">项目名称</label>
-    <input id="projectname" aria-label="项目名称" maxlength="60" required>
+    <input id="projectname" aria-label="项目名称" aria-describedby="projectdialoghint" maxlength="60" required autocomplete="off">
     <p id="projectdialoghint"></p>
     <div class="dialogactions">
       <button type="button" id="cancelprojectdialog">取消</button>
