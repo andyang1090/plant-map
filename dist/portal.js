@@ -7,6 +7,41 @@ const EDITOR_SCRIPTS=[
 ];
 const PORTAL_ASSET_BASE=(document.currentScript?.src||'').replace(/[^/]+$/,'')||'dist/';
 let showProjectTrash=false,editingProjectId=null,editorBootPromise=null,selectedProjectId=null;
+// mobile-view-only: same <960px / coarse-pointer check as the phone layout.
+function plantMobileViewOnly(){
+  return window.matchMedia('(max-width: 960px)').matches||window.matchMedia('(pointer: coarse)').matches;
+}
+window.plantMobileViewOnly=plantMobileViewOnly;
+function syncPlantMobileView(){
+  document.body.classList.toggle('mobile-view-only',plantMobileViewOnly());
+  if(document.body.classList.contains('project-home-open')&&typeof renderProjectHome==='function')renderProjectHome();
+}
+syncPlantMobileView();
+for(const query of ['(max-width: 960px)','(pointer: coarse)'])window.matchMedia(query).addEventListener('change',syncPlantMobileView);
+function portalEditingTarget(target){
+  return !!target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)||target.isContentEditable);
+}
+window.addEventListener('keydown',e=>{
+  if(!plantMobileViewOnly()||document.body.classList.contains('project-home-open'))return;
+  if(portalEditingTarget(e.target))return;
+  const key=e.key,cmd=e.ctrlKey||e.metaKey,lower=key.toLowerCase();
+  let block=key==='Escape'||key==='Delete'||key==='Backspace'||key==='Del'||e.code==='Delete'||key==='F3'||e.code==='F3';
+  if(cmd&&['z','y','s','c','v','x','a','l'].includes(lower))block=true;
+  if(!block&&!e.target?.closest?.('button,a,[role="tab"]')){
+    if(key==='Enter'||(!cmd&&!e.altKey&&(lower==='v'||lower==='h'||/^[0-9.]$/.test(key))))block=true;
+    if(key.startsWith('Arrow')&&!cmd&&!e.altKey&&!e.target?.closest?.('[role="tablist"]'))block=true;
+  }
+  if(!block)return;
+  if(key==='Escape'){
+    try{window.__plantCloseMobileSheets?.()}catch{}
+    document.querySelectorAll('dialog[open]').forEach(dialog=>{try{dialog.close()}catch{}});
+  }
+  e.preventDefault();e.stopImmediatePropagation();
+},true);
+for(const type of ['copy','paste','cut'])window.addEventListener(type,e=>{
+  if(!plantMobileViewOnly()||document.body.classList.contains('project-home-open')||portalEditingTarget(e.target))return;
+  e.preventDefault();e.stopImmediatePropagation();
+},true);
 function pq(s){return document.querySelector(s)}
 function portalToast(s){
   const el=pq('#toast');if(!el)return;el.textContent=s;el.style.display='block';
@@ -66,6 +101,7 @@ function openProjectEditor(id){
   }catch{portalToast('无法打开项目，请先导出备份')}
 }
 function openProjectDialog(id=null){
+  if(plantMobileViewOnly())return;
   editingProjectId=id;
   const project=(loadProjectsLibrary()||projectLibrary).projects.find(p=>p.id===id);
   pq('#projectdialogtitle').textContent=id?'重命名项目':'新建项目';
@@ -76,6 +112,7 @@ function openProjectDialog(id=null){
   pq('#projectdialog').showModal();pq('#projectname').focus();
 }
 function setProjectDeleted(id,deleted){
+  if(deleted&&plantMobileViewOnly())return;
   const library=loadProjectsLibrary()||projectLibrary,project=library.projects.find(p=>p.id===id);if(!project)return;
   if(deleted&&!confirm(`将项目「${project.name}」移入回收站？图纸保留，可随时恢复。`))return;
   try{if(deleted)project.deletedAt=new Date().toISOString();else delete project.deletedAt;saveProjectsLibrary(library);renderProjectHome()}catch{portalToast('项目状态保存失败')}
@@ -110,7 +147,10 @@ function renderProjectCommands(projects){
     bar.append(b);
   };
   if(showProjectTrash)add('恢复项目',p=>setProjectDeleted(p.id,false),{primary:true});
-  else{add('打开',p=>openProjectEditor(p.id),{primary:true});add('重命名',p=>openProjectDialog(p.id));add('删除',p=>setProjectDeleted(p.id,true),{danger:true})}
+  else{
+    add('打开',p=>openProjectEditor(p.id),{primary:true});
+    if(!plantMobileViewOnly()){add('重命名',p=>openProjectDialog(p.id));add('删除',p=>setProjectDeleted(p.id,true),{danger:true})}
+  }
 }
 function selectProjectCard(id){
   selectedProjectId=id;
@@ -122,12 +162,13 @@ function selectProjectCard(id){
   renderProjectCommands(currentHomeProjects());
 }
 function renderProjectHome(){
+  if(plantMobileViewOnly()&&showProjectTrash)showProjectTrash=false;
   const search=(pq('#projectsearch')?.value||'').trim().toLowerCase();
   const projects=currentHomeProjects();
   if(selectedProjectId&&!projects.some(p=>p.id===selectedProjectId))selectedProjectId=null;
   pq('#projectlisttitle').textContent=showProjectTrash?'回收站':'最近使用的项目';
   const subtitle=pq('#projectlistsubtitle');
-  if(subtitle)subtitle.textContent=showProjectTrash?'选择项目后可以恢复，图纸仍保留在此浏览器中。':(window.matchMedia('(max-width: 960px)').matches?'点按选择项目，再点「打开」或双击打开。':'单击选择项目，双击或按 Enter 打开。');
+  if(subtitle)subtitle.textContent=showProjectTrash?'选择项目后可以恢复，图纸仍保留在此浏览器中。':(plantMobileViewOnly()?'点按「打开」或双击打开项目。':(window.matchMedia('(max-width: 960px)').matches?'点按选择项目，再点「打开」或双击打开。':'单击选择项目，双击或按 Enter 打开。'));
   markNavCurrent('#projectstart',!showProjectTrash);
   markNavCurrent('#projecttrash',showProjectTrash);
   const list=pq('#projectcards');
@@ -156,13 +197,16 @@ function renderProjectHome(){
     const actions=document.createElement('div');actions.className='projectactions';
     function action(label,fn,primary=false,danger=false){const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=fn;if(primary)b.className='projectprimary';if(danger)b.classList.add('danger');actions.append(b)}
     if(showProjectTrash)action('恢复项目',()=>setProjectDeleted(project.id,false),true);
-    else{action('打开项目',()=>openProjectEditor(project.id),true);action('重命名',()=>openProjectDialog(project.id));action('删除',()=>setProjectDeleted(project.id,true),false,true)}
+    else{
+      action('打开项目',()=>openProjectEditor(project.id),true);
+      if(!plantMobileViewOnly()){action('重命名',()=>openProjectDialog(project.id));action('删除',()=>setProjectDeleted(project.id,true),false,true)}
+    }
     const details=document.createElement('div');details.className='projectdetails';details.append(name,summary);
     card.append(icon,details,time,actions);list.append(card);
   }
   if(!projects.length){
     const empty=document.createElement('div');empty.className='projectempty';
-    empty.textContent=showProjectTrash?'回收站为空':search?'没有找到匹配项目':'还没有项目。从上方新建空白项目，或从左侧导入 JSON。';
+    empty.textContent=showProjectTrash?'回收站为空':search?'没有找到匹配项目':(plantMobileViewOnly()?'还没有项目。':'还没有项目。从上方新建空白项目，或从左侧导入 JSON。');
     list.append(empty);
   }
   renderProjectCommands(projects);
@@ -180,7 +224,7 @@ function portalValidFloorData(d){
   })&&new Set(floors.map(f=>f.id)).size===floors.length);
 }
 pq('#projectdialog')?.querySelector('form')?.addEventListener('submit',e=>{
-  e.preventDefault();const name=pq('#projectname').value.trim();if(!name||name.length>60)return;
+  e.preventDefault();if(plantMobileViewOnly())return;const name=pq('#projectname').value.trim();if(!name||name.length>60)return;
   const library=loadProjectsLibrary()||projectLibrary;
   if(library.projects.some(p=>!p.deletedAt&&p.id!==editingProjectId&&p.name===name)){pq('#projectname').setAttribute('aria-invalid','true');portalToast('已有同名项目，请换一个名称');return}
   try{
@@ -248,7 +292,7 @@ document.addEventListener('keydown',e=>{
   renderProjectHome();
 });
 const projectImportInput=document.createElement('input');projectImportInput.type='file';projectImportInput.accept='.json,application/json';projectImportInput.hidden=true;document.body.append(projectImportInput);
-pq('#projectimport')?.addEventListener('click',()=>projectImportInput.click());
+pq('#projectimport')?.addEventListener('click',()=>{if(!plantMobileViewOnly())projectImportInput.click()});
 projectImportInput.onchange=async()=>{
   const file=projectImportInput.files[0];if(!file)return;
   try{

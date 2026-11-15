@@ -1,9 +1,11 @@
 // Phone and tablet layout: drawers, pinch zoom, and touch stand-ins for keys.
 // Mouse behavior on a wide screen is left to the existing handlers.
+// mobile-view-only: below 960px or a coarse pointer, the map is a viewer.
 const mobileQuery = window.matchMedia('(max-width: 960px)');
 const coarseQuery = window.matchMedia('(pointer: coarse)');
 function mobileLayout() { return mobileQuery.matches; }
 function touchChrome() { return mobileLayout() || coarseQuery.matches; }
+function mobileViewOnly() { return touchChrome(); }
 
 let pinching = false, pinch = null;
 const pointers = new Map(), suppress = new Set();
@@ -111,8 +113,18 @@ function enlargeHandles() {
   });
 }
 
+function viewOnlyHint() {
+  return page ? '拖动平移 · 双指缩放 · 从目录切换图纸' : '拖动平移 · 双指缩放 · 点按车间进入图纸';
+}
 function updateTouchDock() {
   const dock = document.querySelector('#touchdock');
+  if (mobileViewOnly()) {
+    if (dock) dock.hidden = true;
+    propsToggle?.classList.remove('has-selection');
+    const hint = document.querySelector('#hint');
+    if (hint) hint.textContent = viewOnlyHint();
+    return;
+  }
   if (!dock) return;
   const sketching = tool === 'wall' || tool === 'polyworkshop';
   const multi = typeof selectionIds !== 'undefined' && selectionIds.size > 1;
@@ -143,11 +155,32 @@ function updateTouchDock() {
 }
 
 const mobileDraw = draw;
-draw = function() { mobileDraw(); enlargeHandles(); };
+draw = function() {
+  if (mobileViewOnly()) {
+    selected = null;
+    try { selectionIds.clear(); } catch {}
+  }
+  mobileDraw();
+  enlargeHandles();
+};
 const mobileRender = render;
 render = function() { mobileRender(); enlargeHandles(); updateTouchDock(); };
 const mobileSetTool = setTool;
-setTool = function(toolName) { mobileSetTool(toolName); updateTouchDock(); };
+setTool = function(toolName) {
+  if (mobileViewOnly() && toolName !== 'select') toolName = 'select';
+  mobileSetTool(toolName);
+  updateTouchDock();
+};
+const viewOnlySetSelection = setSelection;
+setSelection = function(ids) {
+  if (mobileViewOnly()) return viewOnlySetSelection([]);
+  return viewOnlySetSelection(ids);
+};
+const viewOnlyDeleteSelection = deleteSelection;
+deleteSelection = function() {
+  if (mobileViewOnly()) return;
+  return viewOnlyDeleteSelection();
+};
 const mobileProps = props;
 props = function() { mobileProps(); updateTouchDock(); };
 const mobileChangePage = changePage;
@@ -183,6 +216,7 @@ function applyPinch() {
   pinch = {dist:Math.max(next.dist, 1), mid:next.mid};
 }
 
+let viewPan = null;
 window.addEventListener('pointerdown', event => {
   if (event.pointerType !== 'touch' || !onCanvasTouch(event)) return;
   pointers.set(event.pointerId, {x:event.clientX, y:event.clientY});
@@ -190,6 +224,7 @@ window.addEventListener('pointerdown', event => {
   event.preventDefault();
   event.stopImmediatePropagation();
   cancelSingleFinger();
+  viewPan = null;
   pinching = true;
   for (const id of pointers.keys()) {
     try { if (svg.hasPointerCapture(id)) svg.releasePointerCapture(id); } catch {}
@@ -197,6 +232,10 @@ window.addEventListener('pointerdown', event => {
   pinch = measurePointers();
 }, true);
 window.addEventListener('pointermove', event => {
+  if (viewPan && viewPan.id === event.pointerId) {
+    const slop = event.pointerType === 'touch' ? 12 : 4;
+    if (Math.hypot(event.clientX - viewPan.x, event.clientY - viewPan.y) > slop) viewPan.moved = true;
+  }
   if (pointers.has(event.pointerId)) pointers.set(event.pointerId, {x:event.clientX, y:event.clientY});
   if (suppress.has(event.pointerId) || pinching) {
     event.preventDefault();
@@ -204,7 +243,46 @@ window.addEventListener('pointermove', event => {
     if (pinching) applyPinch();
   }
 }, true);
+function workshopAt(event) {
+  if (page || typeof rawPoint !== 'function') return null;
+  const p = rawPoint(event);
+  return [...items()].reverse().find(o => o.type === 'workshop' && (typeof inWorkshop === 'function' ? inWorkshop(o, p) : p.x >= o.x && p.x <= o.x + o.w && p.y >= o.y && p.y <= o.y + o.h)) || null;
+}
+function finishViewTap(event) {
+  if (!viewPan || viewPan.id !== event.pointerId) return;
+  const tap = event.type === 'pointerup' && mobileViewOnly() && !viewPan.moved && !pinching && event.button === 0;
+  const point = tap ? {clientX:event.clientX, clientY:event.clientY, altKey:event.altKey} : null;
+  viewPan = null;
+  if (!point) return;
+  setTimeout(() => {
+    if (!mobileViewOnly() || page) return;
+    try {
+      const workshop = workshopAt(point);
+      if (workshop) changePage(workshop.id);
+    } catch {}
+  }, 0);
+}
+window.addEventListener('pointerdown', event => {
+  if (!mobileViewOnly() || pinching || pointers.size >= 2) return;
+  if (event.button !== 0 && event.button !== 1) return;
+  if (!(event.target instanceof Element) || !event.target.closest('#canvas')) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const cam = window.__plantCamera;
+  if (!cam) return;
+  drag = {mode:'pan', client:{x:event.clientX, y:event.clientY}, camera:{...cam}, pointer:event.pointerId};
+  try { svg.setPointerCapture(event.pointerId); } catch {}
+  viewPan = {id:event.pointerId, x:event.clientX, y:event.clientY, moved:event.button !== 0};
+}, true);
+for (const type of ['click', 'dblclick', 'contextmenu']) {
+  window.addEventListener(type, event => {
+    if (!mobileViewOnly() || !(event.target instanceof Element) || !event.target.closest('#canvas')) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+}
 function releasePointer(event) {
+  finishViewTap(event);
   if (!pointers.has(event.pointerId) && !suppress.has(event.pointerId)) return;
   const swallowed = pinching || suppress.has(event.pointerId);
   pointers.delete(event.pointerId);
@@ -265,16 +343,45 @@ navToggle?.addEventListener('click', () => setNavOpen(!siteNav?.classList.contai
 propsToggle?.addEventListener('click', () => setPropsOpen(!propPanel?.classList.contains('is-open')));
 document.querySelector('#propsclose')?.addEventListener('click', () => setPropsOpen(false));
 editorBackdrop?.addEventListener('click', () => { setNavOpen(false); setPropsOpen(false); });
+function lockIdentity(on) {
+  for (const el of [document.querySelector('.brand b'), document.querySelector('#sitename')]) {
+    if (!el) continue;
+    el.contentEditable = on ? 'false' : 'true';
+    if (on) el.removeAttribute('role');
+    else el.setAttribute('role', 'textbox');
+  }
+}
+function syncMobileViewOnly() {
+  const on = mobileViewOnly();
+  document.body.classList.toggle('mobile-view-only', on);
+  const badge = document.querySelector('.heading .badge');
+  if (badge) badge.textContent = on ? '● 查看模式' : '● 编辑模式';
+  svg?.setAttribute('aria-label', on ? '厂区平面图' : '可编辑厂区平面图');
+  lockIdentity(on);
+  if (!on) { updateTouchDock(); return; }
+  try { cancelSketch(); } catch {}
+  try { roomTextEditor?.cancelEdit(); } catch {}
+  try { axisTextEditor?.cancelEdit(); } catch {}
+  try { finishSelectionGesture(true); } catch {}
+  try { finishWallGesture(true); } catch {}
+  try { finishGesture(true); } catch {}
+  selected = null;
+  try { selectionIds.clear(); } catch {}
+  document.querySelectorAll('dialog[open]').forEach(dialog => { try { dialog.close(); } catch {} });
+  setPropsOpen(false);
+  if (tool !== 'select') setTool('select');
+  try { draw(); } catch {}
+  updateTouchDock();
+}
 mobileQuery.addEventListener('change', () => {
   if (!mobileLayout()) { setNavOpen(false); setPropsOpen(false); }
   syncInert();
-  updateTouchDock();
+  syncMobileViewOnly();
 });
-coarseQuery.addEventListener('change', updateTouchDock);
+coarseQuery.addEventListener('change', syncMobileViewOnly);
 
 syncInert();
-enlargeHandles();
-updateTouchDock();
+syncMobileViewOnly();
 function frameMobileSite(){
   if(!mobileLayout()||page||typeof fitCanvas!=='function')return;
   fitCanvas();
