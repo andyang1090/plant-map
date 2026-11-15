@@ -85,9 +85,39 @@ function enclosed(o, box) {
   return o.x >= box.x && o.y >= box.y && o.x+o.w <= box.right && o.y+o.h <= box.bottom;
 }
 
+function axisCrossingAt(p) {
+  if (!page || !data.axes) return null;
+  const threshold = 10 * camera.w / Math.max(1, svg.getBoundingClientRect().width);
+  const axes = items().filter(o => !o.hidden && o.type.endsWith('axis'));
+  const horizontal = axes.filter(o => o.type === 'haxis' && Math.abs(o.y-p.y) < threshold);
+  const vertical = axes.filter(o => o.type === 'vaxis' && Math.abs(o.x-p.x) < threshold);
+  let best = null, distance = threshold;
+  for (const h of horizontal) for (const v of vertical) {
+    if (typeof axisSpanContains === 'function' && (!axisSpanContains(h, v.x, h.y) || !axisSpanContains(v, v.x, h.y))) continue;
+    const d = Math.hypot(v.x-p.x, h.y-p.y);
+    if (d < distance) {best = {x:v.x, y:h.y, ids:[h.id, v.id]}; distance = d;}
+  }
+  return best;
+}
+function chooseAxisCrossing(e) {
+  const marker = e.target.closest('[data-axis-cross]');
+  if (marker) return [marker.dataset.horizontal, marker.dataset.vertical];
+  const hit = e.target.closest('[data-id]');
+  const object = hit && items().find(o => o.id === hit.dataset.id);
+  if (!object || (object.type !== 'wall' && !object.type.endsWith('axis'))) return null;
+  return axisCrossingAt(rawPoint(e))?.ids || null;
+}
 svg.addEventListener('pointerdown', e => {
   if (e.button !== 0 || !['select','marquee'].includes(tool) || spaceHeld || wallGesture || drag) return;
   if (tool==='select' && e.target.closest('[data-wall-vertex],[data-wall-insert],[data-resize]')) return;
+  if (tool === 'select' && !e.ctrlKey && !e.metaKey) {
+    const ids = chooseAxisCrossing(e);
+    if (ids && ids.length === 2 && ids.every(id => items().some(o => o.id === id && !o.hidden))) {
+      e.stopImmediatePropagation(); e.preventDefault();
+      setSelection(ids);
+      return;
+    }
+  }
   const target=e.target.closest('[data-id]'), id=tool==='marquee'?null:target?.dataset.id;
   syncSelection();
   if (id && (e.ctrlKey||e.metaKey)) {

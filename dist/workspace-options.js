@@ -71,14 +71,17 @@ function drawingNodes(excluded=new Set()){
     [{x:o.x,y:o.y},{x:o.x+o.w,y:o.y},{x:o.x,y:o.y+o.h},{x:o.x+o.w,y:o.y+o.h},{x:o.x+o.w/2,y:o.y+o.h/2}]);
 }
 function nearestDrawingNode(p,excluded=new Set()){
-  const threshold=10*camera.w/Math.max(1,svg.getBoundingClientRect().width);let best=null,distance=threshold;
+  const scale=camera.w/Math.max(1,svg.getBoundingClientRect().width),threshold=10*scale;
+  let best=null,distance=threshold,cross=null,crossDistance=threshold;
   for(const candidate of drawingNodes(excluded)){const d=Math.hypot(candidate.x-p.x,candidate.y-p.y);if(d<distance){best=candidate;distance=d}}
   if(page&&data.axes){
     const axes=items().filter(o=>!o.hidden&&!excluded.has(o.id));
     // Orthogonal axes: the nearest crossing is the nearest X and nearest Y.
     const horizontal=axes.filter(o=>o.type==='haxis'&&Math.abs(o.y-p.y)<threshold),vertical=axes.filter(o=>o.type==='vaxis'&&Math.abs(o.x-p.x)<threshold);
-    for(const h of horizontal)for(const v of vertical){const candidate={x:v.x,y:h.y};if(typeof axisSpanContains==='function'&&(!axisSpanContains(h,candidate.x,candidate.y)||!axisSpanContains(v,candidate.x,candidate.y)))continue;const d=Math.hypot(candidate.x-p.x,candidate.y-p.y);if(d<distance){best=candidate;distance=d}}
+    for(const h of horizontal)for(const v of vertical){const candidate={x:v.x,y:h.y};if(typeof axisSpanContains==='function'&&(!axisSpanContains(h,candidate.x,candidate.y)||!axisSpanContains(v,candidate.x,candidate.y)))continue;const d=Math.hypot(candidate.x-p.x,candidate.y-p.y);if(d<crossDistance){cross=candidate;crossDistance=d}}
   }
+  // A wall node a couple of pixels closer must not hide the crossing under the pointer.
+  if(cross&&(!best||crossDistance<distance+2*scale))return cross;
   return best;
 }
 const snapIndicator=node('g',{'pointer-events':'none',id:'nodesnapindicator'});svg.append(snapIndicator);

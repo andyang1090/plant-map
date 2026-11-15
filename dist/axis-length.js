@@ -81,11 +81,13 @@ function raiseAxisLabels(){
     if(text)text.setAttribute('opacity','0');
     const topCircle=circle.cloneNode(true);
     topCircle.setAttribute('opacity','1');
+    topCircle.setAttribute('pointer-events','none');
     topCircle.removeAttribute('display');
     layer.append(topCircle);
     if(text){
       const topText=text.cloneNode(true);
       topText.setAttribute('opacity','1');
+      topText.setAttribute('pointer-events','none');
       topText.removeAttribute('display');
       layer.append(topText);
     }
