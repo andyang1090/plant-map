@@ -280,3 +280,29 @@ body.project-home-open #toast{z-index:300;left:50%;transform:translateX(-50%);bo
   #editor-root .heading{padding:2px 8px}
   #editor-root header{min-height:44px}
 }
+/* mobile-view-only: read-only phone/coarse-pointer viewer. Desktop rules above stay in effect without this class. */
+body.mobile-view-only #tools,
+body.mobile-view-only #undo,
+body.mobile-view-only #propstoggle,
+body.mobile-view-only #proppanel,
+body.mobile-view-only #touchdock,
+body.mobile-view-only #import,
+body.mobile-view-only #copyobjects,
+body.mobile-view-only #pasteobjects,
+body.mobile-view-only #roomdefaultsbutton,
+body.mobile-view-only #orthocontrol,
+body.mobile-view-only #axisspacingcontrol,
+body.mobile-view-only #referencecontrols,
+body.mobile-view-only #axisdistancebox,
+body.mobile-view-only #managefloors,
+body.mobile-view-only .fontcontrol,
+body.mobile-view-only .fontmodecontrol,
+body.mobile-view-only .viewtools label:has(#snap),
+body.mobile-view-only .workshop-order-actions,
+body.mobile-view-only .heading .badge,
+body.mobile-view-only #projectnewnav,
+body.mobile-view-only #projectimport,
+body.mobile-view-only #projecttrash,
+body.mobile-view-only .office-create,
+body.mobile-view-only .projectactions button:not(.projectprimary),
+body.mobile-view-only #projectcommands button:not(.projectprimary){display:none !important}
