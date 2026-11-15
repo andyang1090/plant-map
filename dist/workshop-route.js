@@ -16,7 +16,9 @@ function syncWorkshopRoute(){
   const next=workshopRouteHash();
   if(location.hash===next)return;
   const url=location.pathname+location.search+next;
-  try{history.replaceState(historyStateSafe?.()||window.history.state||{},'',url)}catch{location.hash=next.slice(1)}
+  // The undo stack is named `history`, so this must use the browser session history.
+  const state=typeof historyStateSafe==='function'?historyStateSafe():(window.history.state&&typeof window.history.state==='object'?window.history.state:{});
+  try{window.history.replaceState(state,'',url)}catch{}
   const label=workshopRouteParts().join(' / ');
   if(label)document.title=`WebMap · ${label}`;
 }
@@ -45,6 +47,9 @@ const routeChangePage=changePage;
 changePage=function(id){routeChangePage(id);syncWorkshopRoute()};
 const routeSwitchFloor=switchFloor;
 switchFloor=function(id){routeSwitchFloor(id);syncWorkshopRoute()};
-window.addEventListener('hashchange',()=>{if(!applyingWorkshopRoute)applyWorkshopRoute()});
+window.addEventListener('hashchange',()=>{
+  if(applyingWorkshopRoute||(typeof canvasHistoryNavigating!=='undefined'&&canvasHistoryNavigating))return;
+  applyWorkshopRoute();
+});
 if(location.hash&&location.hash!=='#/'&&location.hash!=='#')applyWorkshopRoute();
 else syncWorkshopRoute();
