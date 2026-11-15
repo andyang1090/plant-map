@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebMap · 项目主页</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="dist/style.css">
+</head>
+<body class="project-home-open">
+<section id="projecthome">
+  <aside class="office-nav">
+    <div class="office-brand">▧ WebMap</div>
+    <nav>
+      <button id="projectstart" class="active">⌂　开始</button>
+      <button id="projectnewnav">＋　新建</button>
+      <button id="projectimport">导入 JSON</button>
+      <button id="projecttrash">回收站</button>
+    </nav>
+    <div class="office-local">● 本地工作空间<small>图纸自动保存在此浏览器 · 无需部署</small></div>
+  </aside>
+  <div class="office-main">
+    <div class="projecttop"><span>WebMap</span><small>项目工作台</small></div>
+    <div class="projectcontent">
+      <div class="projectheading">
+        <div>
+          <h1>欢迎回来</h1>
+          <p>选择一个项目，继续规划厂区与车间空间。</p>
+        </div>
+      </div>
+      <section class="office-create">
+        <h2>新建</h2>
+        <button id="newproject" type="button">
+          <span class="blank-preview"><b>＋</b></span>
+          <strong>空白项目</strong>
+          <small>创建新的厂区与车间图纸</small>
+        </button>
+      </section>
+      <div class="projectfilters">
+        <div>
+          <h2 id="projectlisttitle">最近使用的项目</h2>
+          <p>选择项目，继续上次的工作</p>
+        </div>
+        <label><input id="projectsearch" aria-label="搜索项目" placeholder="搜索项目"></label>
+      </div>
+      <div id="projectcards"></div>
+      <p class="projectfoot">各项目图纸独立保存在此浏览器中，可在项目内导出 JSON 备份。</p>
+    </div>
+  </div>
+</section>
+
+<dialog id="projectdialog">
+  <form>
+    <div class="dialoghead">
+      <h2 id="projectdialogtitle">新建项目</h2>
+      <button type="button" id="closeprojectdialog" aria-label="关闭项目设置">×</button>
+    </div>
+    <label class="field" for="projectname">项目名称</label>
+    <input id="projectname" aria-label="项目名称" maxlength="60" required>
+    <p id="projectdialoghint"></p>
+    <div class="dialogactions">
+      <button type="button" id="cancelprojectdialog">取消</button>
+      <button type="submit" id="saveprojectname">创建项目</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="editorloading" hidden style="position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:#faf9f8ee;color:#185c37;font:15px 'Segoe UI','Microsoft Yahei',sans-serif">正在加载编辑器…</div>
+
+<div id="editor-root" hidden>
+<aside class="nav">
+  <div class="brand">▧ <b>WebMap</b><small>WEBMAP</small></div>
+  <div class="workspace">北区制造基地 <span>⌄</span></div>
+  <div class="navlabel">工作空间</div>
+  <button class="navitem active" id="home">▦　厂区总平图</button>
+  <div class="navlabel">车间目录 <span id="count"></span></div>
+  <div id="tree"></div>
+  <div class="navbottom"><i></i> 本地工作空间<br><small>数据自动保存在此浏览器</small></div>
+</aside>
+<main>
+  <header>
+    <div>工作空间 <span>/</span> <b id="crumb">厂区总平图</b></div>
+    <div class="headeractions"><span id="saved">● 已保存</span><button id="import">导入</button><button id="export">↗ 导出图纸</button></div>
+  </header>
+  <section class="heading">
+    <div>
+      <div class="eyebrow">FACILITY MANAGEMENT</div>
+      <h1 id="title">厂区总平图</h1>
+      <p id="subtitle">规划厂区空间，让每一台机柜都有清晰的位置。</p>
+    </div>
+    <div class="badge">● 编辑模式</div>
+  </section>
+  <section class="stats" id="stats"></section>
+  <section class="editor">
+    <div class="toolbar">
+      <div id="tools"></div>
+      <div class="viewtools">
+        <label><input type="checkbox" id="axes" checked> 轴线</label>
+        <label><input type="checkbox" id="grid" checked> 网格</label>
+        <button id="undo" title="撤销">↶</button>
+        <button id="zoomout">−</button>
+        <span id="zoomlabel">100%</span>
+        <button id="zoomin">＋</button>
+        <button id="fit">适应</button>
+      </div>
+    </div>
+    <div class="drawing">
+      <div class="canvaswrap">
+        <svg id="canvas" tabindex="0" viewBox="0 0 1200 760" role="img" aria-label="可编辑厂区平面图">
+          <defs><pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#dbe2e2"/></pattern></defs>
+          <rect width="1200" height="760" fill="url(#dots)" id="gridbg"/>
+          <g id="objects"></g>
+        </svg>
+        <div class="canvaslegend"><span>■ 车间</span><span>■ 机房</span><span>■ 机柜</span><span>□ 备注</span></div>
+        <div class="north">↑<small>N</small></div>
+      </div>
+      <aside class="properties">
+        <div class="paneltitle">属性面板 <span>⚙</span></div>
+        <div id="properties"></div>
+      </aside>
+    </div>
+    <footer>
+      <span id="hint">选择对象编辑属性 · 双击车间进入内部图纸</span>
+      <span>网格吸附 10 px　 ·　坐标单位 px</span>
+    </footer>
+  </section>
+  <div class="bottomnote">▣ 图纸中的示例数据可自由修改　<span>总平规划 / 车间布局 / 设备定位</span></div>
+</main>
+<input type="file" id="file" accept="application/json" hidden>
+</div>
+
+<div id="toast"></div>
+<script src="dist/project-storage.js"></script>
+<script src="dist/portal.js"></script>
+</body>
+</html>

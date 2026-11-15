@@ -1,0 +1,11 @@
+// Axis grids belong to individual workshops, never the site overview.
+const scopeRender=render;render=function(){data.axes=page?(data.planSettings?.[planKey()]?.axes!==false):false;scopeRender();if(!page){$('#tools').querySelectorAll('[data-tool="haxis"],[data-tool="vaxis"],#axisbatch').forEach(n=>n.remove());if(tool.endsWith('axis'))setTool('select')}$('#axes').closest('label').style.display=page?'':'none'};
+const scopeDraw=draw;draw=function(){scopeDraw();if(!page){for(let g of [...$('#objects').children]){let o=items().find(o=>o.id===g.dataset.id);if(o?.type.endsWith('axis'))g.remove()}}};
+const scopeProps=props;props=function(){scopeProps();if(!page){$('#properties .axislist')?.remove();let help=$('#properties .emptyprop');if(help)help.innerHTML='空白处拖动框选，空格或中键拖动平移，滚轮缩放。<br><br>使用「多边形车间」逐点绘制不规则轮廓，Enter 或双击完成。<br><br>「墙体」可在总平图和车间内部绘制连续折线墙。<br><br>双击车间进入，管理该车间独立的轴线和设备。'}};
+$('#axes').onchange=e=>{if(!page)return;checkpoint();data.planSettings??={};data.planSettings[planKey()]??={};data.planSettings[planKey()].axes=e.target.checked;data.axes=e.target.checked;save();draw()};
+function workshopBoundary(){let old=$('#workshopboundary');old?.remove();let o=data.items.find(o=>o.id===page);if(!o?.points?.length)return;let g=node('g',{id:'workshopboundary','pointer-events':'none'});g.append(node('polygon',{points:o.points.map(p=>`${p[0]*o.w},${p[1]*o.h}`).join(' '),fill:'#e5f0e833',stroke:'#8aab96','stroke-width':1.5,'stroke-dasharray':'8 5','vector-effect':'non-scaling-stroke'}),node('text',{x:0,y:-15,'font-size':12,fill:'#8a9e90'},o.name+' · 轮廓参考'));svg.insertBefore(g,$('#objects'))}
+const boundaryDraw=draw;draw=function(){boundaryDraw();workshopBoundary()};
+const boundaryFit=fitCanvas;fitCanvas=function(){let o=data.items.find(o=>o.id===page);if(!o?.points?.length){boundaryFit();return}let list=items().filter(i=>!i.type.endsWith('axis')),x=Math.min(0,...list.map(i=>i.x))-45,y=Math.min(0,...list.map(i=>i.y))-45,right=Math.max(o.w,...list.map(i=>i.x+i.w))+45,bottom=Math.max(o.h,...list.map(i=>i.y+i.h))+45,r=svg.getBoundingClientRect(),ratio=r.width/r.height;let w=right-x,h=bottom-y;if(w/h<ratio)w=h*ratio;else h=w/ratio;camera={x:x-(w-(right-x))/2,y:y-(h-(bottom-y))/2,w,h};applyCamera()};$('#fit').onclick=()=>fitCanvas();
+render();
+
+
