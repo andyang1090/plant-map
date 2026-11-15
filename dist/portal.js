@@ -3,7 +3,7 @@ const EDITOR_SCRIPTS=[
   'app.js','editor.js','map.js','shapes.js','workshop-scope.js','wall-edit.js','multiselect.js',
   'view-options.js','floors.js','axis-spacing.js','workspace-options.js','axis-input.js','room-text.js',
   'axis-text.js','copy-defaults.js','escape-selection.js','delete-key.js','keyboard-motion.js',
-  'canvas-history.js','axis-length.js','fullscreen.js','workshop-route.js','project-home.js','workshop-order.js'
+  'canvas-history.js','axis-length.js','fullscreen.js','workshop-route.js','project-home.js','workshop-order.js','mobile.js'
 ];
 const PORTAL_ASSET_BASE=(document.currentScript?.src||'').replace(/[^/]+$/,'')||'dist/';
 let showProjectTrash=false,editingProjectId=null,editorBootPromise=null,selectedProjectId=null;
@@ -127,7 +127,7 @@ function renderProjectHome(){
   if(selectedProjectId&&!projects.some(p=>p.id===selectedProjectId))selectedProjectId=null;
   pq('#projectlisttitle').textContent=showProjectTrash?'回收站':'最近使用的项目';
   const subtitle=pq('#projectlistsubtitle');
-  if(subtitle)subtitle.textContent=showProjectTrash?'选择项目后可以恢复，图纸仍保留在此浏览器中。':'单击选择项目，双击或按 Enter 打开。';
+  if(subtitle)subtitle.textContent=showProjectTrash?'选择项目后可以恢复，图纸仍保留在此浏览器中。':(window.matchMedia('(max-width: 960px)').matches?'点按选择项目，再点「打开」或双击打开。':'单击选择项目，双击或按 Enter 打开。');
   markNavCurrent('#projectstart',!showProjectTrash);
   markNavCurrent('#projecttrash',showProjectTrash);
   const list=pq('#projectcards');
@@ -142,6 +142,12 @@ function renderProjectHome(){
     card.setAttribute('aria-selected',project.id===selectedProjectId?'true':'false');
     card.classList.toggle('is-selected',project.id===selectedProjectId);
     card.ondblclick=e=>{if(!showProjectTrash&&!e.target.closest('button'))openProjectEditor(project.id)};
+    card.addEventListener('pointerup',e=>{
+      if(e.pointerType!=='touch'||showProjectTrash||e.target.closest('button'))return;
+      const now=performance.now();
+      if(card._tap&&now-card._tap<450){card._tap=0;openProjectEditor(project.id)}
+      else card._tap=now;
+    });
     const icon=document.createElement('div');icon.className='projecticon';icon.textContent='▧';
     const name=document.createElement('h2');name.textContent=project.name;name.title=project.name;
     const summary=document.createElement('p');summary.textContent=projectSummary(project);
@@ -209,8 +215,27 @@ pq('#projectcards')?.addEventListener('keydown',e=>{
     if(!next)return;selectProjectCard(next.dataset.id);next.focus();
   }
 });
+function setHomeNav(open){
+  const nav=pq('#officenav'),toggle=pq('#homenavtoggle'),backdrop=pq('#homenavbackdrop');
+  if(!nav||!toggle)return;
+  const show=!!open&&window.matchMedia('(max-width: 960px)').matches;
+  nav.classList.toggle('is-open',show);
+  nav.toggleAttribute('inert',window.matchMedia('(max-width: 960px)').matches&&!show);
+  toggle.setAttribute('aria-expanded',show?'true':'false');
+  toggle.setAttribute('aria-label',show?'关闭导航':'打开导航');
+  if(backdrop)backdrop.hidden=!show;
+  if(show)nav.querySelector('button')?.focus();
+  else if(window.matchMedia('(max-width: 960px)').matches&&nav.contains(document.activeElement)&&!document.querySelector('dialog[open]'))toggle.focus();
+}
+window.__setHomeNav=setHomeNav;
+pq('#homenavtoggle')?.addEventListener('click',()=>setHomeNav(!pq('#officenav')?.classList.contains('is-open')));
+pq('#homenavbackdrop')?.addEventListener('click',()=>setHomeNav(false));
+pq('#officenav')?.addEventListener('click',e=>{if(window.matchMedia('(max-width: 960px)').matches&&e.target.closest('button'))setHomeNav(false)});
+window.matchMedia('(max-width: 960px)').addEventListener('change',e=>{if(!e.matches)setHomeNav(false)});
+setHomeNav(false);
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape'||!document.body.classList.contains('project-home-open')||pq('#projectdialog')?.open)return;
+  if(pq('#officenav')?.classList.contains('is-open')){setHomeNav(false);return}
   const active=document.activeElement;
   if(active?.id==='projectsearch'){
     if(active.value){active.value='';syncSearchClear();renderProjectHome()}

@@ -131,6 +131,8 @@ svg.addEventListener('pointerdown', e => {
     selectionIds=new Set([id]);
     return; // Retain the existing single-object editor and node handles.
   }
+  // A finger on empty space pans. A mouse drag in select mode still box-selects.
+  if (!id && tool==='select' && e.pointerType==='touch') return;
   e.stopImmediatePropagation(); e.preventDefault();
   const p=rawPoint(e);
   svg.setPointerCapture(e.pointerId);
@@ -160,7 +162,7 @@ svg.addEventListener('pointermove', e => {
   e.stopImmediatePropagation();
   const gesture=selectionGesture, p=rawPoint(e);
   gesture.end={x:p.x,y:p.y};gesture.altKey=e.altKey;
-  if (!gesture.moved && Math.hypot(e.clientX-gesture.client.x,e.clientY-gesture.client.y)<3) return;
+  if (!gesture.moved && Math.hypot(e.clientX-gesture.client.x,e.clientY-gesture.client.y)<(e.pointerType==='touch'?12:3)) return;
   gesture.moved=true;
   if (gesture.mode==='box') {
     const box={x:Math.min(p.x,gesture.start.x), y:Math.min(p.y,gesture.start.y),
