@@ -6,7 +6,7 @@ const EDITOR_SCRIPTS=[
   'canvas-history.js','axis-length.js','fullscreen.js','workshop-route.js','project-home.js','workshop-order.js'
 ];
 const PORTAL_ASSET_BASE=(document.currentScript?.src||'').replace(/[^/]+$/,'')||'dist/';
-let showProjectTrash=false,editingProjectId=null,editorBootPromise=null;
+let showProjectTrash=false,editingProjectId=null,editorBootPromise=null,selectedProjectId=null;
 function pq(s){return document.querySelector(s)}
 function portalToast(s){
   const el=pq('#toast');if(!el)return;el.textContent=s;el.style.display='block';
@@ -63,6 +63,7 @@ function openProjectDialog(id=null){
   pq('#projectname').value=project?.name||'';
   pq('#saveprojectname').textContent=id?'保存名称':'创建项目';
   pq('#projectdialoghint').textContent=id?'修改项目名称不会更改厂区名称或图纸。':'新项目从空白总平图开始。';
+  pq('#projectname').removeAttribute('aria-invalid');
   pq('#projectdialog').showModal();pq('#projectname').focus();
 }
 function setProjectDeleted(id,deleted){
@@ -78,33 +79,78 @@ function projectSummary(project){
     return `${workshops} 个车间 · ${all.filter(o=>o.type==='room'||o.type==='cabinet').length} 个机房`;
   }catch{return '图纸暂不可读取'}
 }
-function renderProjectHome(){
+function currentHomeProjects(){
   const library=loadProjectsLibrary()||projectLibrary,search=(pq('#projectsearch')?.value||'').trim().toLowerCase();
-  const projects=library.projects.filter(p=>!!p.deletedAt===showProjectTrash&&p.name.toLowerCase().includes(search)).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  return library.projects.filter(p=>!!p.deletedAt===showProjectTrash&&p.name.toLowerCase().includes(search)).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+}
+function markNavCurrent(id,on){
+  const el=pq(id);if(!el)return;
+  el.classList.toggle('active',on);
+  if(on)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');
+}
+function renderProjectCommands(projects){
+  const bar=pq('#projectcommands');if(!bar)return;
+  if(selectedProjectId&&!projects.some(p=>p.id===selectedProjectId))selectedProjectId=null;
+  const project=projects.find(p=>p.id===selectedProjectId)||null;
+  bar.replaceChildren();
+  const add=(label,fn,opts={})=>{
+    const b=document.createElement('button');b.type='button';b.textContent=label;b.disabled=!project;
+    if(opts.primary)b.className='projectprimary';
+    if(opts.danger)b.classList.add('danger');
+    b.onclick=()=>{if(project)fn(project)};
+    bar.append(b);
+  };
+  if(showProjectTrash)add('恢复项目',p=>setProjectDeleted(p.id,false),{primary:true});
+  else{add('打开',p=>openProjectEditor(p.id),{primary:true});add('重命名',p=>openProjectDialog(p.id));add('删除',p=>setProjectDeleted(p.id,true),{danger:true})}
+}
+function selectProjectCard(id){
+  selectedProjectId=id;
+  document.querySelectorAll('#projectcards .projectcard').forEach(card=>{
+    const on=card.dataset.id===id;
+    card.classList.toggle('is-selected',on);
+    card.setAttribute('aria-selected',on?'true':'false');
+  });
+  renderProjectCommands(currentHomeProjects());
+}
+function renderProjectHome(){
+  const search=(pq('#projectsearch')?.value||'').trim().toLowerCase();
+  const projects=currentHomeProjects();
+  if(selectedProjectId&&!projects.some(p=>p.id===selectedProjectId))selectedProjectId=null;
   pq('#projectlisttitle').textContent=showProjectTrash?'回收站':'最近使用的项目';
-  pq('#projectstart').classList.toggle('active',!showProjectTrash);
-  pq('#projecttrash').classList.toggle('active',showProjectTrash);
-  pq('#projectcards').replaceChildren();
+  const subtitle=pq('#projectlistsubtitle');
+  if(subtitle)subtitle.textContent=showProjectTrash?'选择项目后可以恢复，图纸仍保留在此浏览器中。':'单击选择项目，双击或按 Enter 打开。';
+  markNavCurrent('#projectstart',!showProjectTrash);
+  markNavCurrent('#projecttrash',showProjectTrash);
+  const list=pq('#projectcards');
+  list.setAttribute('aria-label',showProjectTrash?'回收站':'最近使用的项目');
+  list.replaceChildren();
+  const head=document.querySelector('.projectlisthead');if(head)head.hidden=!projects.length;
   for(const project of projects){
-    const card=document.createElement('article');card.className='projectcard';card.title='双击打开项目';
+    const card=document.createElement('article');card.className='projectcard';card.dataset.id=project.id;card.tabIndex=0;card.role='option';
+    card.title=showProjectTrash?'选择后可恢复项目':'双击打开项目';
+    card.setAttribute('role','option');
+    card.setAttribute('aria-label',project.name);
+    card.setAttribute('aria-selected',project.id===selectedProjectId?'true':'false');
+    card.classList.toggle('is-selected',project.id===selectedProjectId);
     card.ondblclick=e=>{if(!showProjectTrash&&!e.target.closest('button'))openProjectEditor(project.id)};
     const icon=document.createElement('div');icon.className='projecticon';icon.textContent='▧';
-    const name=document.createElement('h2');name.textContent=project.name;
+    const name=document.createElement('h2');name.textContent=project.name;name.title=project.name;
     const summary=document.createElement('p');summary.textContent=projectSummary(project);
     const time=document.createElement('small');const date=new Date(project.updatedAt);
     time.textContent=Number.isNaN(date.getTime())?'':`最近编辑 ${date.toLocaleString('zh-CN')}`;
     const actions=document.createElement('div');actions.className='projectactions';
-    function action(label,fn,primary=false){const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=fn;if(primary)b.className='projectprimary';actions.append(b)}
+    function action(label,fn,primary=false,danger=false){const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=fn;if(primary)b.className='projectprimary';if(danger)b.classList.add('danger');actions.append(b)}
     if(showProjectTrash)action('恢复项目',()=>setProjectDeleted(project.id,false),true);
-    else{action('打开项目',()=>openProjectEditor(project.id),true);action('重命名',()=>openProjectDialog(project.id));action('删除',()=>setProjectDeleted(project.id,true))}
+    else{action('打开项目',()=>openProjectEditor(project.id),true);action('重命名',()=>openProjectDialog(project.id));action('删除',()=>setProjectDeleted(project.id,true),false,true)}
     const details=document.createElement('div');details.className='projectdetails';details.append(name,summary);
-    card.append(icon,details,time,actions);pq('#projectcards').append(card);
+    card.append(icon,details,time,actions);list.append(card);
   }
   if(!projects.length){
     const empty=document.createElement('div');empty.className='projectempty';
-    empty.textContent=showProjectTrash?'回收站为空':search?'没有找到匹配项目':'还没有项目，点击左侧新建。';
-    pq('#projectcards').append(empty);
+    empty.textContent=showProjectTrash?'回收站为空':search?'没有找到匹配项目':'还没有项目。从上方新建空白项目，或从左侧导入 JSON。';
+    list.append(empty);
   }
+  renderProjectCommands(projects);
 }
 function portalValidObject(o){
   return o&&typeof o.id==='string'&&typeof o.type==='string'&&typeof o.name==='string'&&['x','y','w','h'].every(k=>Number.isFinite(o[k]));
@@ -121,24 +167,52 @@ function portalValidFloorData(d){
 pq('#projectdialog')?.querySelector('form')?.addEventListener('submit',e=>{
   e.preventDefault();const name=pq('#projectname').value.trim();if(!name||name.length>60)return;
   const library=loadProjectsLibrary()||projectLibrary;
-  if(library.projects.some(p=>!p.deletedAt&&p.id!==editingProjectId&&p.name===name)){portalToast('已有同名项目，请换一个名称');return}
+  if(library.projects.some(p=>!p.deletedAt&&p.id!==editingProjectId&&p.name===name)){pq('#projectname').setAttribute('aria-invalid','true');portalToast('已有同名项目，请换一个名称');return}
   try{
-    if(editingProjectId){const project=library.projects.find(p=>p.id===editingProjectId);if(project){project.name=name;saveProjectsLibrary(library)}}
+    if(editingProjectId){const project=library.projects.find(p=>p.id===editingProjectId);if(project){project.name=name;saveProjectsLibrary(library);selectedProjectId=project.id}}
     else{
       const id=crypto.randomUUID(),now=new Date().toISOString();
       const blank={version:1,items:[],plans:{},planSettings:{},floorCatalog:{},activeFloors:{},preferences:{snap:true,axisSpacing:15,roomDefaultWidth:4,roomDefaultHeight:4},identity:{systemName:'WebMap',siteName:name},axes:true,grid:true};
       localStorage.setItem(PROJECT_DIAGRAM_PREFIX+id,JSON.stringify(blank));
-      library.projects.push({id,name,createdAt:now,updatedAt:now});saveProjectsLibrary(library);
+      library.projects.push({id,name,createdAt:now,updatedAt:now});saveProjectsLibrary(library);selectedProjectId=id;showProjectTrash=false;
     }
+    pq('#projectname').removeAttribute('aria-invalid');
     pq('#projectdialog').close();renderProjectHome();
   }catch{portalToast('保存项目失败，浏览器存储空间可能不足')}
 });
 for(const id of ['closeprojectdialog','cancelprojectdialog'])document.getElementById(id)?.addEventListener('click',()=>pq('#projectdialog').close());
 pq('#newproject')?.addEventListener('click',()=>openProjectDialog());
 pq('#projectnewnav')?.addEventListener('click',()=>openProjectDialog());
-pq('#projectsearch')?.addEventListener('input',renderProjectHome);
-pq('#projectstart')?.addEventListener('click',()=>{showProjectTrash=false;renderProjectHome()});
-pq('#projecttrash')?.addEventListener('click',()=>{showProjectTrash=true;renderProjectHome()});
+function syncSearchClear(){const clear=pq('#projectsearchclear');if(clear)clear.hidden=!(pq('#projectsearch')?.value)}
+pq('#projectsearch')?.addEventListener('input',()=>{syncSearchClear();renderProjectHome()});
+pq('#projectsearchclear')?.addEventListener('click',()=>{const input=pq('#projectsearch');if(!input)return;input.value='';syncSearchClear();renderProjectHome();input.focus()});
+pq('#projectname')?.addEventListener('input',()=>pq('#projectname').removeAttribute('aria-invalid'));
+pq('#projectstart')?.addEventListener('click',()=>{showProjectTrash=false;selectedProjectId=null;renderProjectHome()});
+pq('#projecttrash')?.addEventListener('click',()=>{showProjectTrash=true;selectedProjectId=null;renderProjectHome()});
+pq('#projectcards')?.addEventListener('click',e=>{const card=e.target.closest?.('.projectcard');if(card)selectProjectCard(card.dataset.id)},true);
+pq('#projectcards')?.addEventListener('keydown',e=>{
+  const card=e.target.closest?.('.projectcard');if(!card||(e.target.closest?.('button')&&e.key==='Enter'))return;
+  if(e.key==='Enter'){e.preventDefault();if(showProjectTrash)setProjectDeleted(card.dataset.id,false);else openProjectEditor(card.dataset.id)}
+  else if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    const cards=[...pq('#projectcards').querySelectorAll('.projectcard')];
+    const next=cards[cards.indexOf(card)+(e.key==='ArrowDown'?1:-1)];
+    if(!next)return;selectProjectCard(next.dataset.id);next.focus();
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape'||!document.body.classList.contains('project-home-open')||pq('#projectdialog')?.open)return;
+  const active=document.activeElement;
+  if(active?.id==='projectsearch'){
+    if(active.value){active.value='';syncSearchClear();renderProjectHome()}
+    else active.blur();
+    return;
+  }
+  if(active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'))return;
+  if(!selectedProjectId)return;
+  selectedProjectId=null;
+  renderProjectHome();
+});
 const projectImportInput=document.createElement('input');projectImportInput.type='file';projectImportInput.accept='.json,application/json';projectImportInput.hidden=true;document.body.append(projectImportInput);
 pq('#projectimport')?.addEventListener('click',()=>projectImportInput.click());
 projectImportInput.onchange=async()=>{
@@ -152,7 +226,7 @@ projectImportInput.onchange=async()=>{
     while(library.projects.some(p=>!p.deletedAt&&p.name===name))name=base+' ('+(n++)+')';
     localStorage.setItem(PROJECT_DIAGRAM_PREFIX+id,JSON.stringify(diagram));
     library.projects.push({id,name,createdAt:now,updatedAt:now});saveProjectsLibrary(library);
-    showProjectTrash=false;if(pq('#projectsearch'))pq('#projectsearch').value='';renderProjectHome();portalToast('已导入为独立项目');
+    showProjectTrash=false;selectedProjectId=id;if(pq('#projectsearch'))pq('#projectsearch').value='';syncSearchClear();renderProjectHome();portalToast('已导入为独立项目');
   }catch{portalToast('导入失败：请选择有效的系统 JSON 图纸文件（不超过 5 MB）')}
   finally{projectImportInput.value=''}
 };

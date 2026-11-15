@@ -21,9 +21,13 @@ function persistProjectDiagram(diagram){
   if(project)project.updatedAt=new Date().toISOString();saveProjectsLibrary(library);
 }
 // The home screen must not send editing shortcuts to the hidden canvas.
+// Keys aimed at the portal itself still propagate so the command bar can handle them.
 for(const event of ['keydown','copy','paste'])window.addEventListener(event,e=>{
-  if(document.body?.classList.contains('project-home-open')){
-    if(event==='keydown'&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s')e.preventDefault();
-    e.stopImmediatePropagation();
-  }
+  if(!document.body?.classList.contains('project-home-open'))return;
+  if(event==='keydown'&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s')e.preventDefault();
+  if(event==='keydown'&&e.target.closest?.('#projecthome, #projectdialog'))return;
+  e.stopImmediatePropagation();
 },true);
+window.addEventListener('keydown',e=>{
+  if(document.body?.classList.contains('project-home-open'))e.stopImmediatePropagation();
+});
