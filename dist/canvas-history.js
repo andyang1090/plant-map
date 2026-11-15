@@ -1,10 +1,16 @@
 // Browser history also covers mice whose side buttons are handled by the browser.
 const canvasHistorySession=uid();
 let canvasHistoryEntries=[],canvasHistoryIndex=0,restoringCanvasHistory=false;
-function canvasLocation(){return{home:document.body.classList.contains('project-home-open'),workshop:page,floor:page?currentFloor()?.id:null,camera:{...camera}}}
-function sameCanvas(a,b){return !!a.home===!!b.home&&a.workshop===b.workshop&&a.floor===b.floor}
-function validCanvasLocation(entry){return !entry.workshop||data.items.some(o=>o.id===entry.workshop&&o.type==='workshop')&&data.floorCatalog?.[entry.workshop]?.some(f=>f.id===entry.floor)}
-function rememberCanvasCamera(){if(canvasHistoryEntries[canvasHistoryIndex])canvasHistoryEntries[canvasHistoryIndex].camera={...camera}}
+function isProjectHomeView(){return sessionStorage.getItem('plant-atlas-project-mode')!=='editor'}
+function canvasLocation(){return{home:isProjectHomeView(),workshop:page,floor:page?currentFloor()?.id:null,camera:{...camera}}}
+function sameCanvas(a,b){return !!a?.home===!!b?.home&&a?.workshop===b?.workshop&&a?.floor===b?.floor}
+function validCanvasLocation(entry){
+  if(!entry)return false;
+  // Site plan uses workshop:null; only concrete workshop/floor ids need catalog checks.
+  if(entry.home||entry.workshop==null)return true;
+  return data.items.some(o=>o.id===entry.workshop&&o.type==='workshop')&&!!data.floorCatalog?.[entry.workshop]?.some(f=>f.id===entry.floor);
+}
+function rememberCanvasCamera(){if(!isProjectHomeView()&&canvasHistoryEntries[canvasHistoryIndex])canvasHistoryEntries[canvasHistoryIndex].camera={...camera}}
 function nextCanvasIndex(direction,from=canvasHistoryIndex){for(let i=from+direction;i>=0&&i<canvasHistoryEntries.length;i+=direction)if(validCanvasLocation(canvasHistoryEntries[i]))return i;return -1}
 const canvasBack=document.createElement('button'),canvasForward=document.createElement('button');
 canvasBack.textContent='‹';canvasBack.setAttribute('aria-label','上一个画布');canvasBack.title='上一个画布（鼠标后退键）';
@@ -21,6 +27,23 @@ function recordCanvasVisit(){
   window.history.pushState(browserCanvasState(canvasHistoryIndex),'');refreshCanvasHistoryButtons();
 }
 function travelCanvas(direction){const index=nextCanvasIndex(direction);if(index<0)return;rememberCanvasCamera();window.history.go(index-canvasHistoryIndex)}
+function finishCanvasRestore(){queueMicrotask(()=>{restoringCanvasHistory=false;refreshCanvasHistoryButtons()})}
+function restoreCanvasEntry(entry,index){
+  roomTextEditor?.blur();settleFloorGestures();
+  if(entry.home){
+    showProjectHome();
+    canvasHistoryIndex=index;
+    return;
+  }
+  document.body.classList.remove('project-home-open');
+  projectHome.hidden=true;
+  const root=$('#editor-root');if(root)root.hidden=false;
+  sessionStorage.setItem('plant-atlas-project-mode','editor');
+  if(entry.workshop){ensureWorkshopFloors(entry.workshop);data.activeFloors[entry.workshop]=entry.floor}
+  changePage(entry.workshop);
+  if(entry.camera){camera={...entry.camera};const r=svg.getBoundingClientRect();camera.h=camera.w*r.height/Math.max(1,r.width);applyCamera()}
+  canvasHistoryIndex=index;flushSave();
+}
 canvasBack.onclick=()=>travelCanvas(-1);canvasForward.onclick=()=>travelCanvas(1);
 const historyChangePage=changePage;
 changePage=function(id){if(!restoringCanvasHistory)rememberCanvasCamera();historyChangePage(id);recordCanvasVisit()};
@@ -35,15 +58,8 @@ window.addEventListener('popstate',e=>{
     window.history.go((index<0?canvasHistoryIndex:index)-state.index);return;
   }
   rememberCanvasCamera();restoringCanvasHistory=true;
-  try{
-    roomTextEditor?.blur();settleFloorGestures();
-    if(entry.home){showProjectHome();canvasHistoryIndex=state.index;return}
-    document.body.classList.remove('project-home-open');projectHome.hidden=true;sessionStorage.setItem('plant-atlas-project-mode','editor');
-    if(entry.workshop){ensureWorkshopFloors(entry.workshop);data.activeFloors[entry.workshop]=entry.floor}
-    changePage(entry.workshop);
-    if(entry.camera){camera={...entry.camera};const r=svg.getBoundingClientRect();camera.h=camera.w*r.height/Math.max(1,r.width);applyCamera()}
-    canvasHistoryIndex=state.index;flushSave();
-  }finally{restoringCanvasHistory=false;refreshCanvasHistoryButtons()}
+  try{restoreCanvasEntry(entry,state.index)}
+  finally{finishCanvasRestore()}
 });
 window.addEventListener('pointerdown',e=>{
   if(e.button!==3&&e.button!==4)return;
@@ -52,6 +68,13 @@ window.addEventListener('pointerdown',e=>{
 },true);
 for(const event of ['mousedown','mouseup','pointerup','auxclick'])window.addEventListener(event,e=>{if(e.button===3||e.button===4){e.preventDefault();e.stopImmediatePropagation()}},true);
 const canvasHistoryRender=render;render=function(){canvasHistoryRender();refreshCanvasHistoryButtons()};
-canvasHistoryEntries=[{...canvasLocation(),home:true}];window.history.replaceState(browserCanvasState(0),'');
-if(sessionStorage.getItem('plant-atlas-project-mode')==='editor'){canvasHistoryEntries.push(canvasLocation());canvasHistoryIndex=1;window.history.pushState(browserCanvasState(1),'')}
+// Entry 0 is always the project portal. Entry 1 is the editor canvas at boot — never treat it as home,
+// even while portal boot still has project-home-open on <body> while scripts load.
+canvasHistoryEntries=[{home:true,workshop:null,floor:null,camera:{...camera}}];
+window.history.replaceState(browserCanvasState(0),'');
+if(sessionStorage.getItem('plant-atlas-project-mode')==='editor'){
+  canvasHistoryEntries.push({home:false,workshop:page,floor:page?currentFloor()?.id:null,camera:{...camera}});
+  canvasHistoryIndex=1;
+  window.history.pushState(browserCanvasState(1),'');
+}
 refreshCanvasHistoryButtons();

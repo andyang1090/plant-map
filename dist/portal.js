@@ -28,10 +28,11 @@ async function bootEditor(){
     const loading=pq('#editorloading');
     if(loading){loading.hidden=false;loading.style.display='flex'}
     try{
-      const root=pq('#editor-root');if(root)root.hidden=false;
-      for(const src of EDITOR_SCRIPTS)await loadScript(src);
+      // Leave project-home view before editor scripts init canvas history / routes.
       document.body.classList.remove('project-home-open');
       const home=pq('#projecthome');if(home)home.hidden=true;
+      const root=pq('#editor-root');if(root)root.hidden=false;
+      for(const src of EDITOR_SCRIPTS)await loadScript(src);
       document.title='WebMap';
     }finally{
       if(loading){loading.hidden=true;loading.style.display='none'}
@@ -51,6 +52,11 @@ function openProjectEditor(id){
   const library=loadProjectsLibrary()||projectLibrary,project=library.projects.find(p=>p.id===id&&!p.deletedAt);
   if(!project)return;
   try{
+    // Same project with editor already booted: soft-return so forward/back history survives.
+    if(editorBootPromise&&id===currentProjectId&&typeof showProjectEditor==='function'){
+      showProjectEditor(id);
+      return;
+    }
     library.activeId=id;saveProjectsLibrary(library);
     sessionStorage.setItem('plant-atlas-project-mode','editor');
     location.reload();
@@ -158,12 +164,22 @@ projectImportInput.onchange=async()=>{
 };
 window.returnToProjectPortal=function(){
   try{if(typeof flushSave==='function')flushSave()}catch{}
+  // Soft return when the editor bundle is loaded — keeps canvas forward/back working.
+  if(editorBootPromise){
+    if(typeof showProjectHome==='function'){showProjectHome();return}
+    sessionStorage.setItem('plant-atlas-project-mode','home');
+    document.body.classList.add('project-home-open');
+    const home=pq('#projecthome');if(home)home.hidden=false;
+    const root=pq('#editor-root');if(root)root.hidden=true;
+    renderProjectHome();
+    document.title='WebMap · 项目主页';
+    return;
+  }
   sessionStorage.setItem('plant-atlas-project-mode','home');
   location.reload();
 };
 window.openProjectEditor=openProjectEditor;
 window.renderProjectHome=renderProjectHome;
-window.showProjectHome=function(){window.returnToProjectPortal()};
 window.showProjectEditor=openProjectEditor;
 
 if(wantEditor())bootEditor().catch(err=>{console.error(err);portalToast('编辑器加载失败');enterProjectHome()});
