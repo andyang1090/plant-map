@@ -22,8 +22,16 @@ function showProjectHome(){
   try{roomTextEditor?.blur();settleFloorGestures?.();indicateSnap?.(null);clearPreview?.()}catch{}
   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
   try{flushSave()}catch{}
+  // Soft-switch keeps editor scripts and canvas history alive so forward/back still work after publish.
+  if(!restoringCanvasHistory)rememberCanvasCamera?.();
   sessionStorage.setItem('plant-atlas-project-mode','home');
-  location.reload();
+  document.body.classList.add('project-home-open');
+  projectHome.hidden=false;
+  const root=$('#editor-root');if(root)root.hidden=true;
+  if(typeof renderProjectHome==='function')renderProjectHome();
+  document.title='WebMap · 项目主页';
+  if(!restoringCanvasHistory&&typeof recordCanvasVisit==='function')recordCanvasVisit();
+  refreshCanvasHistoryButtons?.();
 }
 
 const projectHomeButton=document.createElement('button');

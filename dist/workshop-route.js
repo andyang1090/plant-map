@@ -16,7 +16,8 @@ function syncWorkshopRoute(){
   const next=workshopRouteHash();
   if(location.hash===next)return;
   const url=location.pathname+location.search+next;
-  try{history.replaceState(historyStateSafe?.()||window.history.state||{},'',url)}catch{location.hash=next.slice(1)}
+  // Must use window.history — app.js declares a local `history` undo array that shadows the browser API.
+  try{window.history.replaceState(historyStateSafe?.()||window.history.state||{},'',url)}catch{location.hash=next.slice(1)}
   const label=workshopRouteParts().join(' / ');
   if(label)document.title=`WebMap · ${label}`;
 }
@@ -45,6 +46,10 @@ const routeChangePage=changePage;
 changePage=function(id){routeChangePage(id);syncWorkshopRoute()};
 const routeSwitchFloor=switchFloor;
 switchFloor=function(id){routeSwitchFloor(id);syncWorkshopRoute()};
-window.addEventListener('hashchange',()=>{if(!applyingWorkshopRoute)applyWorkshopRoute()});
+window.addEventListener('hashchange',()=>{
+  // popstate restore changes the hash too; skip so we do not push a duplicate canvas visit.
+  if(applyingWorkshopRoute||(typeof restoringCanvasHistory!=='undefined'&&restoringCanvasHistory))return;
+  applyWorkshopRoute();
+});
 if(location.hash&&location.hash!=='#/'&&location.hash!=='#')applyWorkshopRoute();
 else syncWorkshopRoute();
