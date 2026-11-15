@@ -51,5 +51,13 @@ window.addEventListener('hashchange',()=>{
   if(applyingWorkshopRoute||(typeof canvasHistoryNavigating!=='undefined'&&canvasHistoryNavigating))return;
   applyWorkshopRoute();
 });
-if(location.hash&&location.hash!=='#/'&&location.hash!=='#')applyWorkshopRoute();
+// The portal class is still on <body> while this file loads, so a homepage
+// open must ignore any leftover workshop hash before that class is removed.
+const openedFromHome=sessionStorage.getItem('plant-atlas-land-on-site')==='1';
+if(openedFromHome)sessionStorage.removeItem('plant-atlas-land-on-site');
+if(openedFromHome){
+  // Hash sync runs after project-home.js drops the portal class.
+  window.__syncSiteAfterBoot=true;
+  if(page)changePage(null);
+}else if(location.hash&&location.hash!=='#/'&&location.hash!=='#')applyWorkshopRoute();
 else syncWorkshopRoute();
