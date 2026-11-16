@@ -30,7 +30,10 @@ function captureCurrentView(){
 function restoreCurrentView(){
   const view=data.savedViews?.[viewKey()];if(!view)return;
   if(!view.camera||!['x','y','w','h'].every(k=>Number.isFinite(view.camera[k]))||view.camera.w<=0||view.camera.h<=0)return;
-  camera={...view.camera};const rect=svg.getBoundingClientRect();camera.h=camera.w*rect.height/Math.max(1,rect.width);
+  camera={...view.camera};const rect=svg.getBoundingClientRect();
+  // Scripts restore the view while #editor-root is still display:none. A zero box
+  // would collapse the height, and the resize observer would then slide the saved view.
+  if(rect.width>0&&rect.height>0)camera.h=camera.w*rect.height/rect.width;
   data.grid=view.grid!==false;snap=view.snap!==false;data.preferences={...data.preferences,...view.preferences,snap};
   if(page&&view.settings){data.planSettings??={};data.planSettings[planKey()]={...view.settings};data.axes=view.axes!==false}
   render();applyCamera();
