@@ -28,6 +28,7 @@ function showProjectHome(){
   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
   try{flushSave()}catch{}
   sessionStorage.setItem('plant-atlas-project-mode','home');
+  try{window.history.replaceState(window.history.state,'',location.pathname+location.search+'#/')}catch{}
   location.reload();
 }
 

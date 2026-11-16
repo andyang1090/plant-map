@@ -105,6 +105,7 @@ function refreshFloorDialog() {
       floorViews.delete(floor.planKey);
       if (data.activeFloors[page] === floor.id) data.activeFloors[page] = catalog[0].id;
       save(); render(); fitCanvas(); refreshFloorDialog();
+      if (typeof syncCurrentDrawingLink === 'function') syncCurrentDrawingLink();
     };
     const count = document.createElement('small');
     count.textContent = `${(data.plans[floor.planKey] || []).length} 个对象`;
@@ -118,12 +119,10 @@ $('#addfloor').onclick = () => {
   const name = $('#newfloorname').value.trim();
   if (!floorNameValid(name)) return;
   settleFloorGestures(); checkpoint();
-  floorViews.set(planKey(), {...camera});
   const id = uid();
   data.floorCatalog[page].push({id, name, planKey:id});
   data.plans[id] = [];
-  data.activeFloors[page] = id;
-  save(); render(); fitCanvas(); refreshFloorDialog();
+  switchFloor(id);
   toast(`已新增 ${name}`);
 };
 

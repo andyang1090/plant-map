@@ -1,63 +1,87 @@
-// Reflect workshop / floor in the URL hash so links can be shared, e.g. #/CT1/1F
-let applyingWorkshopRoute=false;
-function workshopRouteParts(){
-  if(!page)return [];
-  const workshop=data.items.find(o=>o.id===page&&o.type==='workshop');
-  if(!workshop)return [];
-  const floor=typeof currentFloor==='function'?currentFloor():null;
-  return [workshop.name||workshop.id,floor?.name].filter(Boolean);
+// Keep the address bar on the drawing canvas history already recorded.
+// replaceState only — pushState belongs to canvas history, otherwise mouse
+// and browser back would step through a duplicate entry.
+let applyingDrawingLink=false;
+window.__plantEditorRouting=true;
+function drawingTitle(entry){
+  if(!entry||entry.home)return 'WebMap · 项目主页';
+  if(!entry.workshop)return 'WebMap · 厂区总平图';
+  const workshop=data.items.find(o=>o.id===entry.workshop);
+  const floor=data.floorCatalog?.[entry.workshop]?.find(f=>f.id===entry.floor);
+  return 'WebMap · '+[workshop?.name,floor?.name].filter(Boolean).join(' / ');
 }
-function workshopRouteHash(parts=workshopRouteParts()){
-  if(!parts.length)return '#/';
-  return '#/'+parts.map(part=>encodeURIComponent(part)).join('/');
+function syncCurrentDrawingLink(){
+  if(applyingDrawingLink||(typeof restoringCanvasHistory!=='undefined'&&restoringCanvasHistory))return;
+  if(plantHashIsAnchor(location.hash))return;
+  const home=document.body.classList.contains('project-home-open')&&sessionStorage.getItem('plant-atlas-project-mode')!=='editor';
+  const entry=home?{home:true,workshop:null,floor:null}:(typeof canvasLocation==='function'?canvasLocation():{home:false,workshop:page,floor:page?currentFloor()?.id||null:null});
+  if(!home&&typeof canvasHistoryEntries!=='undefined'&&typeof sameCanvas==='function'){
+    const slot=canvasHistoryEntries[canvasHistoryIndex];
+    if(slot&&!sameCanvas(slot,entry)){slot.home=!!entry.home;slot.workshop=entry.workshop||null;slot.floor=entry.floor||null}
+  }
+  const next=drawingHashFor(entry);
+  if(location.hash!==next){
+    const state=typeof historyStateSafe==='function'?historyStateSafe():(window.history.state&&typeof window.history.state==='object'?window.history.state:{});
+    try{window.history.replaceState(state,'',plantHistoryUrl(next))}catch{}
+  }
+  if(!home)document.title=drawingTitle(entry);
 }
-function syncWorkshopRoute(){
-  if(applyingWorkshopRoute||document.body.classList.contains('project-home-open'))return;
-  const next=workshopRouteHash();
-  if(location.hash===next)return;
-  const url=location.pathname+location.search+next;
-  // The undo stack is named `history`, so this must use the browser session history.
-  const state=typeof historyStateSafe==='function'?historyStateSafe():(window.history.state&&typeof window.history.state==='object'?window.history.state:{});
-  try{window.history.replaceState(state,'',url)}catch{}
-  const label=workshopRouteParts().join(' / ');
-  if(label)document.title=`WebMap · ${label}`;
-}
-function applyWorkshopRoute(hash=location.hash){
-  if(document.body.classList.contains('project-home-open'))return false;
-  const raw=String(hash||'').replace(/^#\/?/,'');
-  applyingWorkshopRoute=true;
+function syncWorkshopRoute(){syncCurrentDrawingLink()}
+function adoptDrawingHash(){
+  if(applyingDrawingLink||(typeof canvasHistoryNavigating!=='undefined'&&canvasHistoryNavigating))return;
+  const link=parsePlantHash(location.hash);
+  if(link.kind==='anchor'||link.kind==='empty'||link.kind==='other')return;
+  const target=typeof plantResolveDrawing==='function'?plantResolveDrawing(link):{type:'ignore'};
+  if(target.type==='ignore')return;
+  if(target.type==='missing-project'){
+    sessionStorage.setItem('plant-atlas-link-notice','未找到该项目，已返回项目主页');
+    sessionStorage.setItem('plant-atlas-project-mode','home');
+    try{window.history.replaceState(window.history.state,'',plantHistoryUrl('#/'))}catch{}
+    location.reload();
+    return;
+  }
+  if(target.type==='missing-drawing')toast('未找到该图纸，已打开厂区总平图');
+  const resolved=target.type==='missing-drawing'?{type:'site'}:target;
+  const entry={home:resolved.type==='home',workshop:resolved.type==='workshop'?resolved.workshopId:null,floor:resolved.type==='workshop'?resolved.floorId||null:null,camera:resolved.type==='home'?null:{...camera}};
+  if(typeof canvasHistoryEntries==='undefined'){
+    applyingDrawingLink=true;
+    try{if(entry.home)showCanvasPortal();else plantShowDrawing(resolved)}finally{applyingDrawingLink=false;syncCurrentDrawingLink()}
+    return;
+  }
+  if(typeof sameCanvas==='function'&&sameCanvas(entry,canvasHistoryEntries[canvasHistoryIndex])){
+    const canonical=drawingHashFor(canvasHistoryEntries[canvasHistoryIndex]);
+    if(location.hash!==canonical)window.history.back();
+    return;
+  }
+  if(typeof rememberCanvasCamera==='function')rememberCanvasCamera();
+  canvasHistoryEntries.splice(canvasHistoryIndex+1);
+  canvasHistoryEntries.push(entry);
+  canvasHistoryIndex=canvasHistoryEntries.length-1;
+  applyingDrawingLink=true;
+  const previousRestore=restoringCanvasHistory;
+  restoringCanvasHistory=true;
   try{
-    if(!raw||raw==='site'||raw==='home'){
-      if(page)changePage(null);
-      return true;
-    }
-    const [workshopName,floorName]=raw.split('/').map(part=>{try{return decodeURIComponent(part)}catch{return part}});
-    const workshop=data.items.find(o=>o.type==='workshop'&&(o.name===workshopName||o.id===workshopName));
-    if(!workshop)return false;
-    if(page!==workshop.id)changePage(workshop.id);
-    if(floorName&&typeof ensureWorkshopFloors==='function'){
-      ensureWorkshopFloors(workshop.id);
-      const floor=data.floorCatalog[workshop.id]?.find(f=>f.name===floorName||f.id===floorName);
-      if(floor&&currentFloor()?.id!==floor.id)switchFloor(floor.id);
-    }
-    return true;
-  }finally{applyingWorkshopRoute=false;syncWorkshopRoute()}
+    if(entry.home)showCanvasPortal();
+    else plantShowDrawing(resolved);
+    const shown=typeof canvasLocation==='function'?canvasLocation():entry;
+    const slot=canvasHistoryEntries[canvasHistoryIndex];
+    slot.home=!!shown.home;slot.workshop=shown.workshop||null;slot.floor=shown.floor||null;slot.camera=shown.home?null:shown.camera;
+    window.history.replaceState(browserCanvasState(canvasHistoryIndex),'',plantHistoryUrl(drawingHashFor(slot)));
+    document.title=drawingTitle(slot);
+  }finally{
+    restoringCanvasHistory=previousRestore;
+    applyingDrawingLink=false;
+    if(typeof refreshCanvasHistoryButtons==='function')refreshCanvasHistoryButtons();
+  }
 }
 const routeChangePage=changePage;
-changePage=function(id){routeChangePage(id);syncWorkshopRoute()};
+changePage=function(id){routeChangePage(id);syncCurrentDrawingLink()};
 const routeSwitchFloor=switchFloor;
-switchFloor=function(id){routeSwitchFloor(id);syncWorkshopRoute()};
-window.addEventListener('hashchange',()=>{
-  if(applyingWorkshopRoute||(typeof canvasHistoryNavigating!=='undefined'&&canvasHistoryNavigating))return;
-  applyWorkshopRoute();
-});
-// The portal class is still on <body> while this file loads, so a homepage
-// open must ignore any leftover workshop hash before that class is removed.
+switchFloor=function(id){routeSwitchFloor(id);syncCurrentDrawingLink()};
+window.addEventListener('hashchange',adoptDrawingHash);
 const openedFromHome=sessionStorage.getItem('plant-atlas-land-on-site')==='1';
 if(openedFromHome)sessionStorage.removeItem('plant-atlas-land-on-site');
 if(openedFromHome){
-  // Hash sync runs after project-home.js drops the portal class.
   window.__syncSiteAfterBoot=true;
   if(page)changePage(null);
-}else if(location.hash&&location.hash!=='#/'&&location.hash!=='#')applyWorkshopRoute();
-else syncWorkshopRoute();
+}else syncCurrentDrawingLink();

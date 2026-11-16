@@ -122,11 +122,12 @@ render();
 // saved view from an in-editor session can still reopen that workshop.
 const openOnSite=sessionStorage.getItem('plant-atlas-land-on-site')==='1';
 if(openOnSite)sessionStorage.setItem('plant-atlas-prefer-site','1');
-const routeHash=String(location.hash||'').replace(/^#\/?/,'');
-const routeIsSite=!routeHash||routeHash==='site'||routeHash==='home';
+const routeLink=parsePlantHash(location.hash);
+const routeIsSite=routeLink.kind==='empty'||routeLink.kind==='home'||routeLink.kind==='site'||routeLink.kind==='legacy-site';
+const hashPicksDrawing=routeLink.kind==='workshop'||routeLink.kind==='legacy';
 const keepSite=openOnSite||(sessionStorage.getItem('plant-atlas-prefer-site')==='1'&&routeIsSite);
 const savedLocation=data.lastView;
-if(!keepSite&&savedLocation?.workshop&&data.items.some(o=>o.id===savedLocation.workshop&&o.type==='workshop')){
+if(!hashPicksDrawing&&!keepSite&&savedLocation?.workshop&&data.items.some(o=>o.id===savedLocation.workshop&&o.type==='workshop')){
   ensureWorkshopFloors(savedLocation.workshop);if(data.floorCatalog[savedLocation.workshop].some(f=>f.id===savedLocation.floor))data.activeFloors[savedLocation.workshop]=savedLocation.floor;
   changePage(savedLocation.workshop);
 }else restoreCurrentView();

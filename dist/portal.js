@@ -3,7 +3,7 @@ const EDITOR_SCRIPTS=[
   'app.js','editor.js','map.js','shapes.js','workshop-scope.js','wall-edit.js','multiselect.js',
   'view-options.js','floors.js','axis-spacing.js','workspace-options.js','axis-input.js','room-text.js',
   'axis-text.js','copy-defaults.js','escape-selection.js','delete-key.js','keyboard-motion.js',
-  'canvas-history.js','axis-length.js','fullscreen.js','workshop-route.js','project-home.js','workshop-order.js','mobile.js'
+  'drawing-link.js','canvas-history.js','axis-length.js','fullscreen.js','workshop-route.js','project-home.js','workshop-order.js','mobile.js'
 ];
 const PORTAL_ASSET_BASE=(document.currentScript?.src||'').replace(/[^/]+$/,'')||'dist/';
 let showProjectTrash=false,editingProjectId=null,editorBootPromise=null,selectedProjectId=null;
@@ -64,12 +64,13 @@ async function bootEditor(){
     if(loading){loading.hidden=false;loading.style.display='flex'}
     try{
       const root=pq('#editor-root');if(root)root.hidden=false;
-      for(const src of EDITOR_SCRIPTS)await loadScript(src);
+      for(const src of EDITOR_SCRIPTS){if(window.__plantLinkReloading)return;await loadScript(src)}
       document.body.classList.remove('project-home-open');
       const home=pq('#projecthome');if(home)home.hidden=true;
       document.title='WebMap';
     }finally{
       if(loading){loading.hidden=true;loading.style.display='none'}
+      if(!window.__plantLinkReloading)showPlantLinkNotice();
     }
   })();
   return editorBootPromise;
@@ -81,7 +82,76 @@ function enterProjectHome(){
   const home=pq('#projecthome');if(home)home.hidden=false;
   const root=pq('#editor-root');if(root)root.hidden=true;
   document.title='WebMap · 项目主页';
+  syncHomeAddress();
   renderProjectHome();
+  showPlantLinkNotice();
+}
+function syncHomeAddress(){
+  const link=parsePlantHash(location.hash);
+  if(link.kind==='anchor'||location.hash==='#/')return;
+  try{window.history.replaceState(window.history.state,'',location.pathname+location.search+'#/')}catch{}
+}
+function showPlantLinkNotice(){
+  const message=sessionStorage.getItem('plant-atlas-link-notice');
+  if(!message)return;
+  sessionStorage.removeItem('plant-atlas-link-notice');
+  portalToast(message);
+}
+function readStoredDiagram(projectId){
+  try{return JSON.parse(localStorage.getItem(PROJECT_DIAGRAM_PREFIX+projectId)||'null')}catch{return null}
+}
+function drawingExists(diagram,link){
+  const workshop=(diagram?.items||[]).find(o=>o&&o.type==='workshop'&&o.id===link.workshopId);
+  if(!workshop)return false;
+  if(!link.floorId)return true;
+  const floors=diagram.floorCatalog?.[link.workshopId];
+  if(!Array.isArray(floors))return link.floorId===link.workshopId;
+  return floors.some(floor=>floor&&floor.id===link.floorId);
+}
+function activateLinkedProject(project,preferSite){
+  const library=loadProjectsLibrary()||projectLibrary;
+  if(preferSite)sessionStorage.setItem('plant-atlas-prefer-site','1');
+  else sessionStorage.removeItem('plant-atlas-prefer-site');
+  sessionStorage.setItem('plant-atlas-project-mode','editor');
+  sessionStorage.removeItem('plant-atlas-land-on-site');
+  if(library.activeId===project.id)return 'boot';
+  library.activeId=project.id;saveProjectsLibrary(library);
+  location.reload();
+  return 'reload';
+}
+// A deep link opens that project and drawing. Homepage opens still go through markProjectEditorEntry.
+function prepareDrawingLink(){
+  const link=parsePlantHash(location.hash);
+  if(link.kind==='empty'||link.kind==='anchor'||link.kind==='home'||link.kind==='other'||link.kind==='legacy-site')return false;
+  const library=loadProjectsLibrary()||projectLibrary;
+  if(link.kind==='legacy'){
+    if(sessionStorage.getItem('plant-atlas-project-mode')!=='editor'){
+      const diagram=readStoredDiagram(currentProjectId);
+      const workshop=(diagram?.items||[]).find(o=>o&&o.type==='workshop'&&(o.id===link.workshopName||o.name===link.workshopName));
+      if(!workshop){
+        sessionStorage.setItem('plant-atlas-link-notice','未找到该图纸，已返回项目主页');
+        sessionStorage.setItem('plant-atlas-project-mode','home');
+        try{window.history.replaceState(window.history.state,'',location.pathname+location.search+'#/')}catch{}
+        return false;
+      }
+    }
+    const project=library.projects.find(p=>p.id===currentProjectId&&!p.deletedAt);
+    return project?activateLinkedProject(project,false):false;
+  }
+  const project=library.projects.find(p=>p.id===link.projectId&&!p.deletedAt);
+  if(!project){
+    sessionStorage.setItem('plant-atlas-link-notice','未找到该项目，已返回项目主页');
+    sessionStorage.setItem('plant-atlas-project-mode','home');
+    sessionStorage.removeItem('plant-atlas-land-on-site');
+    try{window.history.replaceState(window.history.state,'',location.pathname+location.search+'#/')}catch{}
+    return false;
+  }
+  if(link.kind==='workshop'&&!drawingExists(readStoredDiagram(project.id),link)){
+    sessionStorage.setItem('plant-atlas-link-notice','未找到该图纸，已打开厂区总平图');
+    try{window.history.replaceState(window.history.state,'',location.pathname+location.search+'#/p/'+encodeURIComponent(project.id)+'/site')}catch{}
+    return activateLinkedProject(project,true);
+  }
+  return activateLinkedProject(project,link.kind==='site');
 }
 // Homepage opens always boot the editor on the site plan. The one-shot flag is
 // consumed after scripts load; prefer-site keeps a later refresh on that plan.
@@ -311,6 +381,7 @@ projectImportInput.onchange=async()=>{
 window.returnToProjectPortal=function(){
   try{if(typeof flushSave==='function')flushSave()}catch{}
   sessionStorage.setItem('plant-atlas-project-mode','home');
+  try{window.history.replaceState(window.history.state,'',location.pathname+location.search+'#/')}catch{}
   location.reload();
 };
 window.markProjectEditorEntry=markProjectEditorEntry;
@@ -319,5 +390,16 @@ window.renderProjectHome=renderProjectHome;
 window.showProjectHome=function(){window.returnToProjectPortal()};
 window.showProjectEditor=openProjectEditor;
 
-if(wantEditor())bootEditor().catch(err=>{console.error(err);portalToast('编辑器加载失败');enterProjectHome()});
-else enterProjectHome();
+const drawingBoot=prepareDrawingLink();
+if(drawingBoot!=='reload'){
+  if(drawingBoot==='boot'||wantEditor())bootEditor().catch(err=>{console.error(err);portalToast('编辑器加载失败');enterProjectHome()});
+  else enterProjectHome();
+}
+window.addEventListener('hashchange',()=>{
+  if(window.__plantEditorRouting||editorBootPromise)return;
+  const link=parsePlantHash(location.hash);
+  if(link.kind!=='site'&&link.kind!=='workshop'&&link.kind!=='legacy')return;
+  const outcome=prepareDrawingLink();
+  if(outcome==='boot')bootEditor().catch(err=>{console.error(err);portalToast('编辑器加载失败');enterProjectHome()});
+  else if(outcome!=='reload')enterProjectHome();
+});

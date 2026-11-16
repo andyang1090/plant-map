@@ -19,12 +19,16 @@ $('.headeractions').prepend(canvasBack,canvasForward);
 function refreshCanvasHistoryButtons(){canvasBack.disabled=nextCanvasIndex(-1)<0;canvasForward.disabled=nextCanvasIndex(1)<0}
 function browserCanvasState(index){return{...(historyStateSafe()),plantCanvas:{session:canvasHistorySession,index}}}
 function historyStateSafe(){const state=window.history.state;return state&&typeof state==='object'?state:{}}
+function canvasHistoryUrl(entry){
+  try{if(typeof drawingHashFor==='function')return plantHistoryUrl(drawingHashFor(entry))}catch{}
+  return location.pathname+location.search+location.hash;
+}
 function recordCanvasVisit(){
   if(restoringCanvasHistory)return;
   const entry=canvasLocation();
   if(sameCanvas(entry,canvasHistoryEntries[canvasHistoryIndex]))return;
   canvasHistoryEntries.splice(canvasHistoryIndex+1);canvasHistoryEntries.push(entry);canvasHistoryIndex++;
-  window.history.pushState(browserCanvasState(canvasHistoryIndex),'');refreshCanvasHistoryButtons();
+  window.history.pushState(browserCanvasState(canvasHistoryIndex),'',canvasHistoryUrl(entry));refreshCanvasHistoryButtons();
 }
 function travelCanvas(direction){const index=nextCanvasIndex(direction);if(index<0)return;rememberCanvasCamera();window.history.go(index-canvasHistoryIndex)}
 canvasBack.onclick=()=>travelCanvas(-1);canvasForward.onclick=()=>travelCanvas(1);
@@ -85,8 +89,13 @@ for(const event of ['mousedown','mouseup','pointerup','auxclick'])window.addEven
 },true);
 const canvasHistoryRender=render;render=function(){canvasHistoryRender();refreshCanvasHistoryButtons()};
 canvasHistoryEntries=[{home:true,workshop:null,floor:null,camera:null}];
-window.history.replaceState(browserCanvasState(0),'');
+const keepCanvasFragment=typeof plantHashIsAnchor==='function'&&plantHashIsAnchor(location.hash);
+if(keepCanvasFragment)window.history.replaceState(browserCanvasState(0),'');
+else window.history.replaceState(browserCanvasState(0),'',canvasHistoryUrl(canvasHistoryEntries[0]));
 if(sessionStorage.getItem('plant-atlas-project-mode')==='editor'){
-  canvasHistoryEntries.push(canvasLocation());canvasHistoryIndex=1;window.history.pushState(browserCanvasState(1),'');
+  const entry=canvasLocation();
+  canvasHistoryEntries.push(entry);canvasHistoryIndex=1;
+  if(keepCanvasFragment)window.history.pushState(browserCanvasState(1),'');
+  else window.history.pushState(browserCanvasState(1),'',canvasHistoryUrl(entry));
 }
 refreshCanvasHistoryButtons();
